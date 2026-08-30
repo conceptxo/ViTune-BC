@@ -276,6 +276,6 @@ fun BitChordPlayer(
                     style = typography.xxs.semiBold.secondary
                 )
             }
-        }
+        }Spacer(modifier = Modifier.height(48.dp))
     }
 }
