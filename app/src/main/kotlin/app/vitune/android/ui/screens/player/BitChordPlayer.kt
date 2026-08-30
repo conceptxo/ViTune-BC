@@ -1,8 +1,12 @@
 package app.vitune.android.ui.screens.player
 
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -19,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -39,11 +44,14 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import app.vitune.android.Database
 import app.vitune.android.R
+import app.vitune.android.models.Lyrics as LyricsData
 import app.vitune.android.models.ui.toUiMedia
 import app.vitune.android.preferences.PlayerPreferences
 import app.vitune.android.service.PlayerService
 import app.vitune.android.ui.components.SeekBar
 import app.vitune.android.ui.components.themed.IconButton
+import app.vitune.android.utils.SynchronizedLyrics
+import app.vitune.android.utils.SynchronizedLyricsState
 import app.vitune.android.utils.forceSeekToNext
 import app.vitune.android.utils.forceSeekToPrevious
 import app.vitune.android.utils.secondary
@@ -53,7 +61,18 @@ import app.vitune.core.ui.Dimensions
 import app.vitune.core.ui.LocalAppearance
 import app.vitune.core.ui.favoritesIcon
 import app.vitune.core.ui.utils.px
+import app.vitune.providers.lrclib.LrcParser
+import app.vitune.providers.lrclib.toLrcFile
 import coil3.compose.AsyncImage
+import kotlinx.collections.immutable.toImmutableList
+import kotlinx.collections.immutable.toImmutableMap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.cancellable
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.withContext
+
+private const val INLINE_LYRIC_UPDATE_DELAY = 50L
 
 @Composable
 fun BitChordPlayer(
@@ -81,6 +100,52 @@ fun BitChordPlayer(
 
     var shuffleOn by remember { mutableStateOf(binder.player.shuffleModeEnabled) }
     var repeatMode by remember { mutableStateOf(binder.player.repeatMode) }
+
+    // --- inline synced lyric line (replaces static "Tap for lyrics" once available) ---
+    var storedLyrics by remember(mediaItem.mediaId) { mutableStateOf<LyricsData?>(null) }
+
+    LaunchedEffect(mediaItem.mediaId) {
+        withContext(Dispatchers.IO) {
+            Database
+                .lyrics(mediaItem.mediaId)
+                .distinctUntilChanged()
+                .cancellable()
+                .collect { storedLyrics = it }
+        }
+    }
+
+    val lyricsState = remember(storedLyrics) {
+        val file = storedLyrics?.synced?.takeIf { it.isNotBlank() }?.let {
+            LrcParser.parse(it)?.toLrcFile()
+        }
+
+        SynchronizedLyricsState(
+            sentences = file?.lines,
+            offset = file?.offset?.inWholeMilliseconds ?: 0L
+        )
+    }
+
+    val synchronizedLyrics = remember(lyricsState) {
+        lyricsState.sentences?.let {
+            SynchronizedLyrics(it.toImmutableMap()) {
+                binder.player.currentPosition + INLINE_LYRIC_UPDATE_DELAY + lyricsState.offset -
+                    (storedLyrics?.startTime ?: 0L)
+            }
+        }
+    }
+
+    LaunchedEffect(synchronizedLyrics) {
+        val current = synchronizedLyrics ?: return@LaunchedEffect
+        while (true) {
+            delay(INLINE_LYRIC_UPDATE_DELAY)
+            current.update()
+        }
+    }
+
+    val currentLyricLine = synchronizedLyrics?.let {
+        it.sentences.values.toImmutableList().getOrNull(it.index)?.takeIf { line -> line.isNotBlank() }
+    }
+    // --- end inline synced lyric line ---
 
     Box(modifier = modifier.fillMaxWidth()) {
         AsyncImage(
@@ -187,11 +252,18 @@ fun BitChordPlayer(
                     .clickable { onShowLyrics(true) }
                     .padding(vertical = 10.dp)
             ) {
-                BasicText(
-                    text = "Tap for lyrics",
-                    style = typography.xs.semiBold.secondary,
-                    maxLines = 1
-                )
+                AnimatedContent(
+                    targetState = currentLyricLine,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "inlineLyricLine"
+                ) { line ->
+                    BasicText(
+                        text = line ?: "Tap for lyrics",
+                        style = typography.xs.semiBold.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(6.dp))
