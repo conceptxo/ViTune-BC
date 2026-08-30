@@ -3,7 +3,6 @@ package app.vitune.android.ui.screens.player
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -18,16 +17,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.material3.Icon
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.FastForward
-import androidx.compose.material.icons.filled.FastRewind
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Repeat
-import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.QueueMusic
-import androidx.compose.material.icons.filled.AllInclusive
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +40,7 @@ import app.vitune.android.ui.components.SeekBar
 import app.vitune.android.ui.components.themed.IconButton
 import app.vitune.android.utils.forceSeekToNext
 import app.vitune.android.utils.forceSeekToPrevious
+import app.vitune.android.utils.secondary
 import app.vitune.android.utils.semiBold
 import app.vitune.android.utils.thumbnail
 import app.vitune.core.ui.LocalAppearance
@@ -127,7 +117,7 @@ fun BitChordPlayer(
                 )
                 BasicText(
                     text = metadata.artist?.toString().orEmpty(),
-                    style = typography.s.semiBold.copy(color = colorPalette.textSecondary),
+                    style = typography.s.semiBold.secondary,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
@@ -147,7 +137,7 @@ fun BitChordPlayer(
 
         BasicText(
             text = "Tap for lyrics",
-            style = typography.xs.semiBold.copy(color = colorPalette.textSecondary),
+            style = typography.xs.semiBold.secondary,
             maxLines = 1,
             modifier = Modifier
                 .fillMaxWidth()
@@ -170,36 +160,38 @@ fun BitChordPlayer(
             horizontalArrangement = Arrangement.spacedBy(40.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Icon(
-                imageVector = Icons.Filled.FastRewind,
-                contentDescription = null,
-                tint = colorPalette.text,
-                modifier = Modifier
-                    .size(28.dp)
-                    .clickable { binder.player.forceSeekToPrevious() }
+            IconButton(
+                icon = R.drawable.play_skip_back,
+                color = colorPalette.text,
+                onClick = { binder.player.forceSeekToPrevious() },
+                modifier = Modifier.size(28.dp)
             )
 
-            Icon(
-                imageVector = if (shouldBePlaying) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                contentDescription = null,
-                tint = colorPalette.text,
+            Box(
                 modifier = Modifier
-                    .size(44.dp)
+                    .clip(RoundedCornerShape(50))
                     .clickable {
                         if (shouldBePlaying) binder.player.pause() else {
                             if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
                             binder.player.play()
                         }
                     }
-            )
+                    .background(colorPalette.background2)
+                    .size(64.dp)
+            ) {
+                AnimatedPlayPauseButton(
+                    playing = shouldBePlaying,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(32.dp)
+                )
+            }
 
-            Icon(
-                imageVector = Icons.Filled.FastForward,
-                contentDescription = null,
-                tint = colorPalette.text,
-                modifier = Modifier
-                    .size(28.dp)
-                    .clickable { binder.player.forceSeekToNext() }
+            IconButton(
+                icon = R.drawable.play_skip_forward,
+                color = colorPalette.text,
+                onClick = { binder.player.forceSeekToNext() },
+                modifier = Modifier.size(28.dp)
             )
         }
 
@@ -209,52 +201,43 @@ fun BitChordPlayer(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
         ) {
-            Icon(
-                imageVector = Icons.Filled.Shuffle,
-                contentDescription = null,
-                tint = if (shuffleOn) colorPalette.accent else colorPalette.textSecondary,
-                modifier = Modifier
-                    .size(20.dp)
-                    .clickable {
-                        shuffleOn = !shuffleOn
-                        binder.player.shuffleModeEnabled = shuffleOn
-                    }
+            BasicText(
+                text = "Shuffle",
+                style = typography.xxs.semiBold.let {
+                    if (shuffleOn) it.copy(color = colorPalette.accent) else it.secondary
+                },
+                modifier = Modifier.clickable {
+                    shuffleOn = !shuffleOn
+                    binder.player.shuffleModeEnabled = shuffleOn
+                }
             )
 
-            Icon(
-                imageVector = Icons.Filled.Repeat,
-                contentDescription = null,
-                tint = if (repeatMode != Player.REPEAT_MODE_OFF) colorPalette.accent else colorPalette.textSecondary,
-                modifier = Modifier
-                    .size(20.dp)
-                    .clickable {
-                        repeatMode = when (repeatMode) {
-                            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-                            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-                            else -> Player.REPEAT_MODE_OFF
-                        }
-                        binder.player.repeatMode = repeatMode
+            BasicText(
+                text = "Repeat",
+                style = typography.xxs.semiBold.let {
+                    if (repeatMode != Player.REPEAT_MODE_OFF) it.copy(color = colorPalette.accent) else it.secondary
+                },
+                modifier = Modifier.clickable {
+                    repeatMode = when (repeatMode) {
+                        Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                        Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                        else -> Player.REPEAT_MODE_OFF
                     }
+                    binder.player.repeatMode = repeatMode
+                }
             )
 
-            Icon(
-                imageVector = Icons.Filled.AllInclusive,
-                contentDescription = null,
-                tint = if (PlayerPreferences.trackLoopEnabled) colorPalette.accent else colorPalette.textSecondary,
-                modifier = Modifier
-                    .size(20.dp)
-                    .clickable {
-                        PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled
-                    }
+            IconButton(
+                icon = R.drawable.infinite,
+                enabled = PlayerPreferences.trackLoopEnabled,
+                onClick = { PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled },
+                modifier = Modifier.size(20.dp)
             )
 
-            Icon(
-                imageVector = Icons.Filled.QueueMusic,
-                contentDescription = null,
-                tint = colorPalette.textSecondary,
-                modifier = Modifier
-                    .size(20.dp)
-                    .clickable { onOpenQueue() }
+            BasicText(
+                text = "Queue",
+                style = typography.xxs.semiBold.secondary,
+                modifier = Modifier.clickable { onOpenQueue() }
             )
         }
     }
