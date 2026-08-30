@@ -9,6 +9,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,20 +22,25 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -71,6 +77,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 
 private const val INLINE_LYRIC_UPDATE_DELAY = 50L
 
@@ -103,6 +110,10 @@ fun BitChordPlayer(
 
     var shuffleOn by remember { mutableStateOf(binder.player.shuffleModeEnabled) }
     var repeatMode by remember { mutableStateOf(binder.player.repeatMode) }
+
+    // Local mirror of player volume (0f..1f) so the slider can drag smoothly
+    // without waiting on player callbacks for every frame.
+    var volume by remember { mutableFloatStateOf(binder.player.volume) }
 
     var storedLyrics by remember(mediaItem.mediaId) { mutableStateOf<LyricsData?>(null) }
 
@@ -149,6 +160,24 @@ fun BitChordPlayer(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
+        // ---- Full-bleed blurred background ----
+        // A heavily blurred, darkened copy of the artwork behind everything,
+        // instead of (or under) the mesh gradient — gives the "photo fills the
+        // whole screen" look from the reference shot. Kept as a separate layer
+        // from the sharp artwork above so the crop/scale of the two can differ.
+        AsyncImage(
+            model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(48.dp)
+        )
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color.Black.copy(alpha = 0.42f))
+        )
         MeshGradientBackground(
             palette = meshColors,
             trackKey = mediaItem.mediaId
@@ -160,6 +189,22 @@ fun BitChordPlayer(
                 .fillMaxSize()
                 .navigationBarsPadding()
         ) {
+            // ---- Drag handle ----
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(28.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Box(
+                    modifier = Modifier
+                        .width(36.dp)
+                        .height(4.dp)
+                        .clip(RoundedCornerShape(2.dp))
+                        .background(Color.White.copy(alpha = 0.35f))
+                )
+            }
+
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -245,24 +290,32 @@ fun BitChordPlayer(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                Box(
+                // ---- Current lyric line, with a trailing chevron ----
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onShowLyrics(true) }
                         .padding(vertical = 6.dp)
                 ) {
-                    AnimatedContent(
-                        targetState = currentLyricLine,
-                        transitionSpec = { fadeIn() togetherWith fadeOut() },
-                        label = "inlineLyricLine"
-                    ) { line ->
-                        BasicText(
-                            text = line ?: "Tap for lyrics",
-                            style = typography.xs.semiBold.secondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
+                    Box(modifier = Modifier.weight(1f)) {
+                        AnimatedContent(
+                            targetState = currentLyricLine,
+                            transitionSpec = { fadeIn() togetherWith fadeOut() },
+                            label = "inlineLyricLine"
+                        ) { line ->
+                            BasicText(
+                                text = line ?: "Tap for lyrics",
+                                style = typography.xs.semiBold.secondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
                     }
+                    BasicText(
+                        text = "\u203A",
+                        style = typography.xs.semiBold.secondary
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -316,73 +369,140 @@ fun BitChordPlayer(
                     )
                 }
 
+                Spacer(modifier = Modifier.height(20.dp))
+
+                // ---- Volume slider ----
+                // Built by hand rather than pulling in a Slider component, so
+                // this doesn't risk a new dependency the way material.icons did.
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(20.dp)
+                ) {
+                    BasicText(
+                        text = "\uD83D\uDD09",
+                        style = typography.xxs.secondary
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color.White.copy(alpha = 0.25f))
+                            .pointerInput(Unit) {
+                                detectHorizontalDragGestures { change, _ ->
+                                    val newVolume = (change.position.x / size.width)
+                                        .coerceIn(0f, 1f)
+                                    volume = newVolume
+                                    binder.player.volume = newVolume
+                                }
+                            }
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth(volume.coerceIn(0f, 1f))
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(2.dp))
+                                .background(Color.White.copy(alpha = 0.85f))
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+                    BasicText(
+                        text = "\uD83D\uDD0A",
+                        style = typography.xxs.secondary
+                    )
+                }
+
                 Spacer(modifier = Modifier.height(16.dp))
 
+                // ---- Shuffle / Repeat / Autoplay / Queue toggle row ----
                 Row(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .clickable {
-                                shuffleOn = !shuffleOn
-                                binder.player.shuffleModeEnabled = shuffleOn
-                            }
-                            .size(28.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        BasicText(
-                            text = "\u21C4",
-                            style = typography.s.semiBold.let {
-                                if (shuffleOn) it.copy(color = colorPalette.accent) else it.secondary
-                            }.copy(textAlign = TextAlign.Center)
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clickable {
-                                repeatMode = when (repeatMode) {
-                                    Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-                                    Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-                                    else -> Player.REPEAT_MODE_OFF
-                                }
-                                binder.player.repeatMode = repeatMode
-                            }
-                            .size(28.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        BasicText(
-                            text = "\u21BB",
-                            style = typography.s.semiBold.let {
-                                if (repeatMode != Player.REPEAT_MODE_OFF) it.copy(color = colorPalette.accent) else it.secondary
-                            }.copy(textAlign = TextAlign.Center)
-                        )
-                    }
-
-                    IconButton(
-                        icon = R.drawable.infinite,
-                        enabled = PlayerPreferences.trackLoopEnabled,
-                        onClick = { PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled },
-                        modifier = Modifier.size(18.dp)
+                    ToggleGlyph(
+                        glyph = "\u21C4",
+                        active = shuffleOn,
+                        colorPalette = colorPalette,
+                        typography = typography,
+                        onClick = {
+                            shuffleOn = !shuffleOn
+                            binder.player.shuffleModeEnabled = shuffleOn
+                        }
                     )
 
-                    Box(
-                        modifier = Modifier
-                            .clickable { onOpenQueue() }
-                            .size(28.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        BasicText(
-                            text = "\u2630",
-                            style = typography.s.semiBold.secondary.copy(textAlign = TextAlign.Center)
-                        )
-                    }
+                    ToggleGlyph(
+                        glyph = "\u21BB",
+                        active = repeatMode != Player.REPEAT_MODE_OFF,
+                        colorPalette = colorPalette,
+                        typography = typography,
+                        onClick = {
+                            repeatMode = when (repeatMode) {
+                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                                else -> Player.REPEAT_MODE_OFF
+                            }
+                            binder.player.repeatMode = repeatMode
+                        }
+                    )
+
+                    ToggleGlyph(
+                        glyph = "\u221E",
+                        active = PlayerPreferences.trackLoopEnabled,
+                        colorPalette = colorPalette,
+                        typography = typography,
+                        onClick = {
+                            PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled
+                        }
+                    )
+
+                    ToggleGlyph(
+                        glyph = "\u2630",
+                        active = false,
+                        colorPalette = colorPalette,
+                        typography = typography,
+                        onClick = onOpenQueue
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
             }
         }
+    }
+}
+
+/**
+ * One of the circular toggle buttons in the bottom row — a glyph on a
+ * translucent pill background that lights up when [active]. Matches the
+ * reference screenshot's shuffle/repeat/autoplay/queue row without pulling in
+ * any icon library.
+ */
+@Composable
+private fun ToggleGlyph(
+    glyph: String,
+    active: Boolean,
+    colorPalette: app.vitune.core.ui.ColorPalette,
+    typography: app.vitune.core.ui.Typography,
+    onClick: () -> Unit
+) {
+    Box(
+        modifier = Modifier
+            .clip(CircleShape)
+            .background(if (active) Color.White.copy(alpha = 0.18f) else Color.Transparent)
+            .clickable(onClick = onClick)
+            .size(36.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        BasicText(
+            text = glyph,
+            style = typography.s.semiBold.let {
+                if (active) it.copy(color = colorPalette.accent) else it.secondary
+            }.copy(textAlign = TextAlign.Center)
+        )
     }
 }
