@@ -383,7 +383,7 @@ fun BitChordPlayer(
                 }
             }
 
-            Spacer(modifier = Modifier.height(32.dp))
+            Spacer(modifier = Modifier.height(120.dp))
         }
     }
 }
