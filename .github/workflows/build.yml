@@ -14,11 +14,17 @@ jobs:
         with:
           lfs: true
 
-      - name: Set up JDK 17
+      - name: Set up JDKs
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
           distribution: 'temurin'
+          java-version: |
+            17
+            25
+
+      - name: Tell Gradle where the JDKs are
+        run: |
+          echo "org.gradle.java.installations.fromEnv=JAVA_HOME_17_X64,JAVA_HOME_25_X64" >> gradle.properties
 
       - name: Fix gradle wrapper jar
         run: |
