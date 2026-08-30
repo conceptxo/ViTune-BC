@@ -28,10 +28,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import app.vitune.android.Database
 import app.vitune.android.R
 import app.vitune.android.models.ui.toUiMedia
 import app.vitune.android.preferences.PlayerPreferences
@@ -58,7 +61,8 @@ fun BitChordPlayer(
     duration: Long,
     likedAt: Long?,
     setLikedAt: (Long?) -> Unit,
-    onOpenLyrics: () -> Unit,
+    isShowingLyrics: Boolean,
+    onShowLyrics: (Boolean) -> Unit,
     onOpenQueue: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -99,6 +103,20 @@ fun BitChordPlayer(
                 contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f)
             )
+
+            Lyrics(
+                mediaId = mediaItem.mediaId,
+                isDisplayed = isShowingLyrics,
+                onDismiss = { onShowLyrics(false) },
+                ensureSongInserted = { Database.insert(mediaItem) },
+                mediaMetadataProvider = { mediaItem.mediaMetadata },
+                durationProvider = { binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET },
+                onOpenDialog = {},
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                shouldShowSynchronizedLyrics = PlayerPreferences.isShowingSynchronizedLyrics,
+                setShouldShowSynchronizedLyrics = { PlayerPreferences.isShowingSynchronizedLyrics = it },
+                showControls = true
+            )
         }
 
         Spacer(modifier = Modifier.height(20.dp))
@@ -135,16 +153,20 @@ fun BitChordPlayer(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        BasicText(
-            text = "Tap for lyrics",
-            style = typography.xs.semiBold.secondary,
-            maxLines = 1,
+        Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable { onOpenLyrics() }
-        )
+                .clickable { onShowLyrics(true) }
+                .padding(vertical = 10.dp)
+        ) {
+            BasicText(
+                text = "Tap for lyrics",
+                style = typography.xs.semiBold.secondary,
+                maxLines = 1
+            )
+        }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(6.dp))
 
         SeekBar(
             binder = binder,
@@ -201,31 +223,41 @@ fun BitChordPlayer(
             horizontalArrangement = Arrangement.SpaceBetween,
             modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
         ) {
-            BasicText(
-                text = "Shuffle",
-                style = typography.xxs.semiBold.let {
-                    if (shuffleOn) it.copy(color = colorPalette.accent) else it.secondary
-                },
-                modifier = Modifier.clickable {
-                    shuffleOn = !shuffleOn
-                    binder.player.shuffleModeEnabled = shuffleOn
-                }
-            )
-
-            BasicText(
-                text = "Repeat",
-                style = typography.xxs.semiBold.let {
-                    if (repeatMode != Player.REPEAT_MODE_OFF) it.copy(color = colorPalette.accent) else it.secondary
-                },
-                modifier = Modifier.clickable {
-                    repeatMode = when (repeatMode) {
-                        Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-                        Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-                        else -> Player.REPEAT_MODE_OFF
+            Box(
+                modifier = Modifier
+                    .clickable {
+                        shuffleOn = !shuffleOn
+                        binder.player.shuffleModeEnabled = shuffleOn
                     }
-                    binder.player.repeatMode = repeatMode
-                }
-            )
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                BasicText(
+                    text = "Shuffle",
+                    style = typography.xxs.semiBold.let {
+                        if (shuffleOn) it.copy(color = colorPalette.accent) else it.secondary
+                    }
+                )
+            }
+
+            Box(
+                modifier = Modifier
+                    .clickable {
+                        repeatMode = when (repeatMode) {
+                            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                            else -> Player.REPEAT_MODE_OFF
+                        }
+                        binder.player.repeatMode = repeatMode
+                    }
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                BasicText(
+                    text = "Repeat",
+                    style = typography.xxs.semiBold.let {
+                        if (repeatMode != Player.REPEAT_MODE_OFF) it.copy(color = colorPalette.accent) else it.secondary
+                    }
+                )
+            }
 
             IconButton(
                 icon = R.drawable.infinite,
@@ -234,11 +266,16 @@ fun BitChordPlayer(
                 modifier = Modifier.size(20.dp)
             )
 
-            BasicText(
-                text = "Queue",
-                style = typography.xxs.semiBold.secondary,
-                modifier = Modifier.clickable { onOpenQueue() }
-            )
+            Box(
+                modifier = Modifier
+                    .clickable { onOpenQueue() }
+                    .padding(horizontal = 12.dp, vertical = 10.dp)
+            ) {
+                BasicText(
+                    text = "Queue",
+                    style = typography.xxs.semiBold.secondary
+                )
+            }
         }
     }
 }
