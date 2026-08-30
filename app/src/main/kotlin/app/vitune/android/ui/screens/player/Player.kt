@@ -441,21 +441,22 @@ fun Player(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = containerModifier.padding(top = 54.dp)
         ) {
-BitChordPlayer(
-    mediaItem = mediaItem!!,
-    binder = binder!!,
-    shouldBePlaying = shouldBePlaying,
-    position = position,
-    duration = duration,
-    likedAt = likedAt,
-    setLikedAt = { likedAt = it },
-    onOpenLyrics = { isShowingLyrics = true },
-    onOpenQueue = {},
-    modifier = Modifier
-        .padding(vertical = 8.dp)
-        .fillMaxWidth()
-        .weight(1f)
-)
+            BitChordPlayer(
+                mediaItem = mediaItem!!,
+                binder = binder!!,
+                shouldBePlaying = shouldBePlaying,
+                position = position,
+                duration = duration,
+                likedAt = likedAt,
+                setLikedAt = { likedAt = it },
+                onOpenLyrics = { isShowingLyrics = true },
+                onOpenQueue = {},
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+        }
 
         var audioDialogOpen by rememberSaveable { mutableStateOf(false) }
 
