@@ -35,6 +35,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
@@ -306,29 +307,43 @@ fun BitChordPlayer(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
             ) {
-                IconButton(
-                    icon = R.drawable.shuffle,
-                    enabled = shuffleOn,
-                    onClick = {
-                        shuffleOn = !shuffleOn
-                        binder.player.shuffleModeEnabled = shuffleOn
-                    },
-                    modifier = Modifier.size(22.dp)
-                )
-
-                IconButton(
-                    icon = R.drawable.repeat,
-                    enabled = repeatMode != Player.REPEAT_MODE_OFF,
-                    onClick = {
-                        repeatMode = when (repeatMode) {
-                            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-                            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-                            else -> Player.REPEAT_MODE_OFF
+                Box(
+                    modifier = Modifier
+                        .clickable {
+                            shuffleOn = !shuffleOn
+                            binder.player.shuffleModeEnabled = shuffleOn
                         }
-                        binder.player.repeatMode = repeatMode
-                    },
-                    modifier = Modifier.size(22.dp)
-                )
+                        .size(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BasicText(
+                        text = "\u21C4",
+                        style = typography.l.semiBold.let {
+                            if (shuffleOn) it.copy(color = colorPalette.accent) else it.secondary
+                        }.copy(textAlign = TextAlign.Center)
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clickable {
+                            repeatMode = when (repeatMode) {
+                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                                else -> Player.REPEAT_MODE_OFF
+                            }
+                            binder.player.repeatMode = repeatMode
+                        }
+                        .size(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BasicText(
+                        text = "\u21BB",
+                        style = typography.l.semiBold.let {
+                            if (repeatMode != Player.REPEAT_MODE_OFF) it.copy(color = colorPalette.accent) else it.secondary
+                        }.copy(textAlign = TextAlign.Center)
+                    )
+                }
 
                 IconButton(
                     icon = R.drawable.infinite,
@@ -337,12 +352,17 @@ fun BitChordPlayer(
                     modifier = Modifier.size(20.dp)
                 )
 
-                IconButton(
-                    icon = R.drawable.queue_music,
-                    color = colorPalette.text,
-                    onClick = { onOpenQueue() },
-                    modifier = Modifier.size(22.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .clickable { onOpenQueue() }
+                        .size(32.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    BasicText(
+                        text = "\u2630",
+                        style = typography.l.semiBold.secondary.copy(textAlign = TextAlign.Center)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
