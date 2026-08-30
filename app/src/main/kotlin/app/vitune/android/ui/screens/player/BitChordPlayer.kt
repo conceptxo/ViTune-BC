@@ -421,9 +421,13 @@ fun BitChordPlayer(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // ---- Repeat / Track loop / Queue / More row ----
+                // ---- Repeat only ----
+                // Loop, queue, and more/ellipsis are already provided by
+                // ViTune's own Queue() dock underneath this screen (see
+                // Player.kt), so they're deliberately left out here to avoid
+                // showing two of each.
                 Row(
-                    horizontalArrangement = Arrangement.SpaceEvenly,
+                    horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                 ) {
@@ -440,29 +444,6 @@ fun BitChordPlayer(
                             }
                             binder.player.repeatMode = repeatMode
                         }
-                    )
-                    ToggleGlyph(
-                        glyph = "\u221E",
-                        active = PlayerPreferences.trackLoopEnabled,
-                        colorPalette = colorPalette,
-                        typography = typography,
-                        onClick = {
-                            PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled
-                        }
-                    )
-                    ToggleGlyph(
-                        glyph = "\u2630",
-                        active = false,
-                        colorPalette = colorPalette,
-                        typography = typography,
-                        onClick = onOpenQueue
-                    )
-                    ToggleGlyph(
-                        glyph = "\u22EF",
-                        active = false,
-                        colorPalette = colorPalette,
-                        typography = typography,
-                        onClick = { /* wire to your playlist/more menu action */ }
                     )
                 }
 
