@@ -77,7 +77,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
 
 private const val INLINE_LYRIC_UPDATE_DELAY = 50L
 
@@ -108,11 +107,7 @@ fun BitChordPlayer(
         label = "artScale"
     )
 
-    var shuffleOn by remember { mutableStateOf(binder.player.shuffleModeEnabled) }
     var repeatMode by remember { mutableStateOf(binder.player.repeatMode) }
-
-    // Local mirror of player volume (0f..1f) so the slider can drag smoothly
-    // without waiting on player callbacks for every frame.
     var volume by remember { mutableFloatStateOf(binder.player.volume) }
 
     var storedLyrics by remember(mediaItem.mediaId) { mutableStateOf<LyricsData?>(null) }
@@ -161,10 +156,6 @@ fun BitChordPlayer(
 
     Box(modifier = modifier.fillMaxSize()) {
         // ---- Full-bleed blurred background ----
-        // A heavily blurred, darkened copy of the artwork behind everything,
-        // instead of (or under) the mesh gradient — gives the "photo fills the
-        // whole screen" look from the reference shot. Kept as a separate layer
-        // from the sharp artwork above so the crop/scale of the two can differ.
         AsyncImage(
             model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
             contentDescription = null,
@@ -222,14 +213,28 @@ fun BitChordPlayer(
                     modifier = Modifier.fillMaxSize()
                 )
 
+                // ---- Edge blend: all four sides fade into the blurred backdrop ----
                 Box(
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
-                                0f to Color.Transparent,
-                                0.82f to Color.Transparent,
-                                1f to Color.Black.copy(alpha = 0.35f)
+                                0f to Color.Black.copy(alpha = 0.30f),
+                                0.14f to Color.Transparent,
+                                0.80f to Color.Transparent,
+                                1f to Color.Black.copy(alpha = 0.40f)
+                            )
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.horizontalGradient(
+                                0f to Color.Black.copy(alpha = 0.28f),
+                                0.12f to Color.Transparent,
+                                0.88f to Color.Transparent,
+                                1f to Color.Black.copy(alpha = 0.28f)
                             )
                         )
                 )
@@ -290,7 +295,6 @@ fun BitChordPlayer(
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                // ---- Current lyric line, with a trailing chevron ----
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -372,8 +376,6 @@ fun BitChordPlayer(
                 Spacer(modifier = Modifier.height(20.dp))
 
                 // ---- Volume slider ----
-                // Built by hand rather than pulling in a Slider component, so
-                // this doesn't risk a new dependency the way material.icons did.
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -382,7 +384,7 @@ fun BitChordPlayer(
                 ) {
                     BasicText(
                         text = "\uD83D\uDD09",
-                        style = typography.xxs.secondary
+                        style = typography.xs.secondary
                     )
                     Spacer(modifier = Modifier.width(8.dp))
 
@@ -413,29 +415,18 @@ fun BitChordPlayer(
                     Spacer(modifier = Modifier.width(8.dp))
                     BasicText(
                         text = "\uD83D\uDD0A",
-                        style = typography.xxs.secondary
+                        style = typography.xs.secondary
                     )
                 }
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // ---- Shuffle / Repeat / Autoplay / Queue toggle row ----
+                // ---- Repeat / Track loop / Queue / More row ----
                 Row(
                     horizontalArrangement = Arrangement.SpaceEvenly,
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
                 ) {
-                    ToggleGlyph(
-                        glyph = "\u21C4",
-                        active = shuffleOn,
-                        colorPalette = colorPalette,
-                        typography = typography,
-                        onClick = {
-                            shuffleOn = !shuffleOn
-                            binder.player.shuffleModeEnabled = shuffleOn
-                        }
-                    )
-
                     ToggleGlyph(
                         glyph = "\u21BB",
                         active = repeatMode != Player.REPEAT_MODE_OFF,
@@ -450,7 +441,6 @@ fun BitChordPlayer(
                             binder.player.repeatMode = repeatMode
                         }
                     )
-
                     ToggleGlyph(
                         glyph = "\u221E",
                         active = PlayerPreferences.trackLoopEnabled,
@@ -460,13 +450,19 @@ fun BitChordPlayer(
                             PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled
                         }
                     )
-
                     ToggleGlyph(
                         glyph = "\u2630",
                         active = false,
                         colorPalette = colorPalette,
                         typography = typography,
                         onClick = onOpenQueue
+                    )
+                    ToggleGlyph(
+                        glyph = "\u22EF",
+                        active = false,
+                        colorPalette = colorPalette,
+                        typography = typography,
+                        onClick = { /* wire to your playlist/more menu action */ }
                     )
                 }
 
@@ -476,12 +472,6 @@ fun BitChordPlayer(
     }
 }
 
-/**
- * One of the circular toggle buttons in the bottom row — a glyph on a
- * translucent pill background that lights up when [active]. Matches the
- * reference screenshot's shuffle/repeat/autoplay/queue row without pulling in
- * any icon library.
- */
 @Composable
 private fun ToggleGlyph(
     glyph: String,
