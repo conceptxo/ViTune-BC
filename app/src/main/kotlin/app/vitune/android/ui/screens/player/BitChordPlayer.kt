@@ -104,7 +104,6 @@ fun BitChordPlayer(
     var shuffleOn by remember { mutableStateOf(binder.player.shuffleModeEnabled) }
     var repeatMode by remember { mutableStateOf(binder.player.repeatMode) }
 
-    // --- inline synced lyric line (replaces static "Tap for lyrics" once available) ---
     var storedLyrics by remember(mediaItem.mediaId) { mutableStateOf<LyricsData?>(null) }
 
     LaunchedEffect(mediaItem.mediaId) {
@@ -148,7 +147,6 @@ fun BitChordPlayer(
     val currentLyricLine = synchronizedLyrics?.let {
         it.sentences.values.toImmutableList().getOrNull(it.index)?.takeIf { line -> line.isNotBlank() }
     }
-    // --- end inline synced lyric line ---
 
     Box(modifier = modifier.fillMaxSize()) {
         MeshGradientBackground(
@@ -162,11 +160,10 @@ fun BitChordPlayer(
                 .fillMaxSize()
                 .navigationBarsPadding()
         ) {
-            // Artwork with a soft fade at the bottom, so it blends into the
-            // mesh background instead of stopping at a hard edge.
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
+                    .weight(1.1f)
                     .aspectRatio(1f)
                     .graphicsLayer {
                         scaleX = artScale
@@ -177,13 +174,12 @@ fun BitChordPlayer(
                     model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+                    modifier = Modifier.fillMaxSize()
                 )
 
                 Box(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
+                        .fillMaxSize()
                         .background(
                             Brush.verticalGradient(
                                 0f to Color.Transparent,
@@ -201,15 +197,13 @@ fun BitChordPlayer(
                     mediaMetadataProvider = { mediaItem.mediaMetadata },
                     durationProvider = { binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET },
                     onOpenDialog = {},
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                    modifier = Modifier.fillMaxSize(),
                     shouldShowSynchronizedLyrics = PlayerPreferences.isShowingSynchronizedLyrics,
                     setShouldShowSynchronizedLyrics = { PlayerPreferences.isShowingSynchronizedLyrics = it },
                     showControls = true
                 )
             }
 
-            // Everything below the artwork stretches to fill exactly the remaining
-            // screen height — never clips, never scrolls.
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 modifier = Modifier
@@ -217,7 +211,7 @@ fun BitChordPlayer(
                     .weight(1f)
                     .padding(horizontal = 28.dp)
             ) {
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Row(
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -249,13 +243,13 @@ fun BitChordPlayer(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(10.dp))
+                Spacer(modifier = Modifier.height(8.dp))
 
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { onShowLyrics(true) }
-                        .padding(vertical = 10.dp)
+                        .padding(vertical = 6.dp)
                 ) {
                     AnimatedContent(
                         targetState = currentLyricLine,
@@ -271,7 +265,7 @@ fun BitChordPlayer(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
+                Spacer(modifier = Modifier.height(4.dp))
 
                 SeekBar(
                     binder = binder,
@@ -281,8 +275,6 @@ fun BitChordPlayer(
                     style = PlayerPreferences.SeekBarStyle.Static
                 )
 
-                // Flexible gap: absorbs whatever space is left so the controls
-                // below always sit at the bottom, regardless of screen height.
                 Spacer(modifier = Modifier.weight(1f))
 
                 Row(
@@ -306,13 +298,13 @@ fun BitChordPlayer(
                                 }
                             }
                             .background(colorPalette.background2)
-                            .size(64.dp)
+                            .size(60.dp)
                     ) {
                         AnimatedPlayPauseButton(
                             playing = shouldBePlaying,
                             modifier = Modifier
                                 .align(Alignment.Center)
-                                .size(32.dp)
+                                .size(30.dp)
                         )
                     }
 
@@ -324,7 +316,7 @@ fun BitChordPlayer(
                     )
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
                 Row(
                     horizontalArrangement = Arrangement.SpaceEvenly,
@@ -337,12 +329,12 @@ fun BitChordPlayer(
                                 shuffleOn = !shuffleOn
                                 binder.player.shuffleModeEnabled = shuffleOn
                             }
-                            .size(32.dp),
+                            .size(28.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         BasicText(
                             text = "\u21C4",
-                            style = typography.l.semiBold.let {
+                            style = typography.s.semiBold.let {
                                 if (shuffleOn) it.copy(color = colorPalette.accent) else it.secondary
                             }.copy(textAlign = TextAlign.Center)
                         )
@@ -358,12 +350,12 @@ fun BitChordPlayer(
                                 }
                                 binder.player.repeatMode = repeatMode
                             }
-                            .size(32.dp),
+                            .size(28.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         BasicText(
                             text = "\u21BB",
-                            style = typography.l.semiBold.let {
+                            style = typography.s.semiBold.let {
                                 if (repeatMode != Player.REPEAT_MODE_OFF) it.copy(color = colorPalette.accent) else it.secondary
                             }.copy(textAlign = TextAlign.Center)
                         )
@@ -373,23 +365,23 @@ fun BitChordPlayer(
                         icon = R.drawable.infinite,
                         enabled = PlayerPreferences.trackLoopEnabled,
                         onClick = { PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled },
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(18.dp)
                     )
 
                     Box(
                         modifier = Modifier
                             .clickable { onOpenQueue() }
-                            .size(32.dp),
+                            .size(28.dp),
                         contentAlignment = Alignment.Center
                     ) {
                         BasicText(
                             text = "\u2630",
-                            style = typography.l.semiBold.secondary.copy(textAlign = TextAlign.Center)
+                            style = typography.s.semiBold.secondary.copy(textAlign = TextAlign.Center)
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(24.dp))
+                Spacer(modifier = Modifier.height(16.dp))
             }
         }
     }
