@@ -15,16 +15,15 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.weight
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -33,11 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
@@ -150,73 +145,53 @@ fun BitChordPlayer(
     }
     // --- end inline synced lyric line ---
 
-    Box(modifier = modifier.fillMaxWidth()) {
-        AsyncImage(
-            model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .blur(60.dp)
-                .graphicsLayer { alpha = 0.5f }
-        )
-
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = modifier
+            .fillMaxSize()
+            .navigationBarsPadding()
+    ) {
+        // Full-bleed artwork, edge to edge, no card/shadow/rounded corners
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight()
-                .background(
-                    Brush.verticalGradient(
-                        0f to Color.Transparent,
-                        0.6f to colorPalette.background0.copy(alpha = 0.85f),
-                        1f to colorPalette.background0
-                    )
-                )
-        )
+                .aspectRatio(1f)
+                .graphicsLayer {
+                    scaleX = artScale
+                    scaleY = artScale
+                }
+        ) {
+            AsyncImage(
+                model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+            )
 
+            Lyrics(
+                mediaId = mediaItem.mediaId,
+                isDisplayed = isShowingLyrics,
+                onDismiss = { onShowLyrics(false) },
+                ensureSongInserted = { Database.insert(mediaItem) },
+                mediaMetadataProvider = { mediaItem.mediaMetadata },
+                durationProvider = { binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET },
+                onOpenDialog = {},
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                shouldShowSynchronizedLyrics = PlayerPreferences.isShowingSynchronizedLyrics,
+                setShouldShowSynchronizedLyrics = { PlayerPreferences.isShowingSynchronizedLyrics = it },
+                showControls = true
+            )
+        }
+
+        // Everything below the artwork stretches to fill exactly the remaining
+        // screen height — never clips, never scrolls.
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
+                .weight(1f)
                 .padding(horizontal = 28.dp)
-                .navigationBarsPadding()
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                    .graphicsLayer {
-                        scaleX = artScale
-                        scaleY = artScale
-                    }
-                    .shadow(14.dp, RoundedCornerShape(14.dp))
-                    .clip(RoundedCornerShape(14.dp))
-                    .background(colorPalette.background2)
-            ) {
-                AsyncImage(
-                    model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
-                    contentDescription = null,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f)
-                )
-
-                Lyrics(
-                    mediaId = mediaItem.mediaId,
-                    isDisplayed = isShowingLyrics,
-                    onDismiss = { onShowLyrics(false) },
-                    ensureSongInserted = { Database.insert(mediaItem) },
-                    mediaMetadataProvider = { mediaItem.mediaMetadata },
-                    durationProvider = { binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET },
-                    onOpenDialog = {},
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                    shouldShowSynchronizedLyrics = PlayerPreferences.isShowingSynchronizedLyrics,
-                    setShouldShowSynchronizedLyrics = { PlayerPreferences.isShowingSynchronizedLyrics = it },
-                    showControls = true
-                )
-            }
-
             Spacer(modifier = Modifier.height(20.dp))
 
             Row(
@@ -281,7 +256,9 @@ fun BitChordPlayer(
                 style = PlayerPreferences.SeekBarStyle.Static
             )
 
-            Spacer(modifier = Modifier.height(20.dp))
+            // Flexible gap: absorbs whatever space is left so the controls
+            // below always sit at the bottom, regardless of screen height.
+            Spacer(modifier = Modifier.weight(1f))
 
             Row(
                 horizontalArrangement = Arrangement.spacedBy(40.dp),
@@ -325,44 +302,33 @@ fun BitChordPlayer(
             Spacer(modifier = Modifier.height(24.dp))
 
             Row(
-                horizontalArrangement = Arrangement.SpaceBetween,
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
             ) {
-                Box(
-                    modifier = Modifier
-                        .clickable {
-                            shuffleOn = !shuffleOn
-                            binder.player.shuffleModeEnabled = shuffleOn
-                        }
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                ) {
-                    BasicText(
-                        text = "Shuffle",
-                        style = typography.xxs.semiBold.let {
-                            if (shuffleOn) it.copy(color = colorPalette.accent) else it.secondary
-                        }
-                    )
-                }
+                IconButton(
+                    icon = R.drawable.shuffle,
+                    enabled = shuffleOn,
+                    onClick = {
+                        shuffleOn = !shuffleOn
+                        binder.player.shuffleModeEnabled = shuffleOn
+                    },
+                    modifier = Modifier.size(22.dp)
+                )
 
-                Box(
-                    modifier = Modifier
-                        .clickable {
-                            repeatMode = when (repeatMode) {
-                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-                                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-                                else -> Player.REPEAT_MODE_OFF
-                            }
-                            binder.player.repeatMode = repeatMode
+                IconButton(
+                    icon = R.drawable.repeat,
+                    enabled = repeatMode != Player.REPEAT_MODE_OFF,
+                    onClick = {
+                        repeatMode = when (repeatMode) {
+                            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                            else -> Player.REPEAT_MODE_OFF
                         }
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                ) {
-                    BasicText(
-                        text = "Repeat",
-                        style = typography.xxs.semiBold.let {
-                            if (repeatMode != Player.REPEAT_MODE_OFF) it.copy(color = colorPalette.accent) else it.secondary
-                        }
-                    )
-                }
+                        binder.player.repeatMode = repeatMode
+                    },
+                    modifier = Modifier.size(22.dp)
+                )
 
                 IconButton(
                     icon = R.drawable.infinite,
@@ -371,19 +337,15 @@ fun BitChordPlayer(
                     modifier = Modifier.size(20.dp)
                 )
 
-                Box(
-                    modifier = Modifier
-                        .clickable { onOpenQueue() }
-                        .padding(horizontal = 12.dp, vertical = 10.dp)
-                ) {
-                    BasicText(
-                        text = "Queue",
-                        style = typography.xxs.semiBold.secondary
-                    )
-                }
+                IconButton(
+                    icon = R.drawable.queue_music,
+                    color = colorPalette.text,
+                    onClick = { onOpenQueue() },
+                    modifier = Modifier.size(22.dp)
+                )
             }
 
-            Spacer(modifier = Modifier.height(120.dp))
+            Spacer(modifier = Modifier.height(24.dp))
         }
     }
 }
