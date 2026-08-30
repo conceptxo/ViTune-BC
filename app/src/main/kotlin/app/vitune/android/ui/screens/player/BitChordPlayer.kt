@@ -98,9 +98,6 @@ fun BitChordPlayer(
     val metadata = mediaItem.mediaMetadata
     val media = remember(mediaItem, duration) { mediaItem.toUiMedia(duration) }
 
-    val artworkUrl = remember(metadata) { metadata.artworkUri?.toString() }
-    val meshColors = rememberArtworkColors(artworkUrl)
-
     val artScale by animateFloatAsState(
         targetValue = if (shouldBePlaying) 1f else 0.92f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
@@ -155,23 +152,19 @@ fun BitChordPlayer(
     }
 
     Box(modifier = modifier.fillMaxSize()) {
-        // ---- Full-bleed blurred background ----
+        // ---- Full-bleed blurred background: the artwork itself, and nothing else ----
         AsyncImage(
             model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .blur(48.dp)
+                .blur(60.dp)
         )
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Black.copy(alpha = 0.42f))
-        )
-        MeshGradientBackground(
-            palette = meshColors,
-            trackKey = mediaItem.mediaId
+                .background(Color.Black.copy(alpha = 0.30f))
         )
 
         Column(
