@@ -171,7 +171,6 @@ fun Queue(
     }
 
     LaunchedEffect(mediaItemIndex, shouldLoadSuggestions) {
-        // TODO: I hate all of this
         runCatching {
             val newMediaId = windows[mediaItemIndex].mediaItem.mediaId
             if (previousMediaId == newMediaId && suggestions?.getOrNull()
@@ -222,30 +221,27 @@ fun Queue(
         state = layoutState,
         modifier = modifier.fillMaxSize(),
         collapsedContent = { innerModifier ->
-            Row(
+            Box(
                 modifier = Modifier
-                    .clip(shape)
-                    .background(colorPalette.background2)
                     .fillMaxSize()
                     .then(innerModifier)
                     .padding(horizontalBottomPaddingValues),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
+                contentAlignment = Alignment.Center
             ) {
-                Spacer(modifier = Modifier.width(4.dp))
-                beforeContent()
-                Spacer(modifier = Modifier.weight(1f))
-
-                Image(
-                    painter = painterResource(R.drawable.playlist),
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(colorPalette.text),
-                    modifier = Modifier.size(18.dp)
-                )
-
-                Spacer(modifier = Modifier.weight(1f))
-                afterContent()
-                Spacer(modifier = Modifier.width(4.dp))
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(50))
+                        .background(colorPalette.accent)
+                        .size(44.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.playlist),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(colorPalette.onAccent),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
         }
     ) {
@@ -420,7 +416,7 @@ fun Queue(
                             contentType = { ContentType.Placeholder }
                         ) {
                             if (binder.isLoadingRadio || suggestions == null)
-                                Column(modifier = Modifier.shimmer()) {
+                                                              Column(modifier = Modifier.shimmer()) {
                                     repeat(3) { index ->
                                         SongItemPlaceholder(
                                             thumbnailSize = Dimensions.thumbnails.song,
