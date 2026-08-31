@@ -116,14 +116,10 @@ import kotlin.math.floor
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
-// ============================================================================
-// Lightweight twinkling starfield used behind the floating mini player pill.
-// Colors come from rememberArtworkColors() in ArtworkMesh.kt (untouched).
-// ============================================================================
-
-private const val MiniPlayerStarCount = 36
+private const val MiniPlayerStarCount = 55
 private const val MiniPlayerTwinkleCycleSeconds = 6.5f
 private const val MiniPlayerFrameIntervalMs = 40L
+private const val MiniPlayerShootingStarCycleSeconds = 4.2f
 
 private data class MiniPlayerStar(
     val x: Float,
@@ -141,6 +137,50 @@ private fun twinkleGlow(pattern: Int, timeSeconds: Float): Float {
     val phase = (((timeSeconds / MiniPlayerTwinkleCycleSeconds) + pattern * 0.21f) % 1f)
     val pulse = if (phase < 0.5f) phase * 2f else (1f - phase) * 2f
     return pulse * pulse
+}
+
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMiniPlayerShootingStar(
+    timeSeconds: Float,
+    glowColor: Color
+) {
+    val cycle = floor(timeSeconds / MiniPlayerShootingStarCycleSeconds).toInt()
+    val progress = (timeSeconds % MiniPlayerShootingStarCycleSeconds) / MiniPlayerShootingStarCycleSeconds
+    val visibleProgress = progress.coerceIn(0f, 1f)
+    val fade = if (visibleProgress < 0.55f) 1f else (1f - ((visibleProgress - 0.55f) / 0.45f)).coerceIn(0f, 1f)
+    if (fade <= 0.01f) return
+
+    val startXFrac = 0.35f + seededUnit(cycle, 53, 11) * 0.35f
+    val start = Offset(size.width * startXFrac, -4f)
+    val direction = Offset(-1f / sqrt(2f), 1f / sqrt(2f))
+    val travel = size.maxDimension * 1.4f
+    val head = Offset(
+        x = start.x + direction.x * travel * visibleProgress,
+        y = start.y + direction.y * travel * visibleProgress
+    )
+    val tailLength = size.minDimension.coerceAtLeast(120f) * 0.9f
+    val segments = 5
+
+    repeat(segments) { segment ->
+        val startFactor = segment / segments.toFloat()
+        val endFactor = (segment + 1) / segments.toFloat()
+        val segStart = Offset(
+            x = head.x - direction.x * tailLength * startFactor,
+            y = head.y - direction.y * tailLength * startFactor
+        )
+        val segEnd = Offset(
+            x = head.x - direction.x * tailLength * endFactor,
+            y = head.y - direction.y * tailLength * endFactor
+        )
+        val segAlpha = fade * (1f - startFactor).coerceIn(0f, 1f)
+        drawLine(
+            color = glowColor.copy(alpha = segAlpha * 0.55f),
+            start = segStart,
+            end = segEnd,
+            strokeWidth = 1.6f
+        )
+    }
+
+    drawCircle(color = Color.White.copy(alpha = fade), radius = 1.6f, center = head)
 }
 
 @Composable
@@ -164,12 +204,12 @@ private fun MiniPlayerGalaxyBackground(
     var frameMillis by remember { mutableLongStateOf(0L) }
 
     val skyColors = meshPalette.colors.ifEmpty {
-        listOf(Color(0xFF120018), Color(0xFF1B0330), Color(0xFF05010A), Color.White)
+        listOf(Color(0xFF1A0B3D), Color(0xFF2D1465), Color(0xFF0A0420), Color.White)
     }
 
-    val topColor by animateColorAsState(skyColors.getOrElse(0) { Color(0xFF120018) }, tween(900), label = "gTop")
-    val midColor by animateColorAsState(skyColors.getOrElse(1) { Color(0xFF1B0330) }, tween(900), label = "gMid")
-    val bottomColor by animateColorAsState(skyColors.getOrElse(2) { Color(0xFF05010A) }, tween(900), label = "gBottom")
+    val topColor by animateColorAsState(skyColors.getOrElse(0) { Color(0xFF1A0B3D) }, tween(900), label = "gTop")
+    val midColor by animateColorAsState(skyColors.getOrElse(1) { Color(0xFF2D1465) }, tween(900), label = "gMid")
+    val bottomColor by animateColorAsState(skyColors.getOrElse(2) { Color(0xFF0A0420) }, tween(900), label = "gBottom")
     val glowColor by animateColorAsState(skyColors.getOrElse(3) { Color.White }, tween(900), label = "gGlow")
 
     LaunchedEffect(Unit) {
@@ -188,9 +228,9 @@ private fun MiniPlayerGalaxyBackground(
 
         drawRect(
             brush = Brush.verticalGradient(
-                0f to topColor.copy(alpha = 0.55f),
-                0.6f to midColor.copy(alpha = 0.55f),
-                1f to bottomColor.copy(alpha = 0.55f)
+                0f to topColor.copy(alpha = 0.85f),
+                0.6f to midColor.copy(alpha = 0.85f),
+                1f to bottomColor.copy(alpha = 0.85f)
             ),
             size = size
         )
@@ -214,6 +254,8 @@ private fun MiniPlayerGalaxyBackground(
                 center = center
             )
         }
+
+        drawMiniPlayerShootingStar(timeSeconds = timeSeconds, glowColor = glowColor)
     }
 }
 
@@ -294,8 +336,6 @@ fun Player(
 
     OnGlobalRoute { if (layoutState.expanded) layoutState.collapseSoft() }
 
-    // Fixed, moderate corner radius (not a full stadium) so the circular
-    // thumbnail always has room to sit fully inside the curve.
     val miniPlayerShape = RoundedCornerShape(28.dp)
 
     val artworkColors = rememberArtworkColors(imageUrl = metadata?.artworkUri?.toString())
@@ -443,7 +483,7 @@ fun Player(
                     Box(
                         modifier = Modifier
                             .clickable(
-                                onClick = {
+                                                              onClick = {
                                     if (shouldBePlaying) binder?.player?.pause()
                                     else {
                                         if (binder?.player?.playbackState == Player.STATE_IDLE) binder.player.prepare()
