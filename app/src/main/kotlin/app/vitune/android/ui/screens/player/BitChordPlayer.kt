@@ -515,16 +515,12 @@ fun BitChordPlayer(
                 modifier = Modifier.size(20.dp)
             )
 
-            Box(
-                modifier = Modifier
-                    .clickable { onOpenQueue() }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
-            ) {
-                BasicText(
-                    text = "Queue",
-                    style = typography.xxs.semiBold.secondary
-                )
-            }
+IconButton(
+    icon = R.drawable.ellipsis_horizontal,
+    color = colorPalette.text,
+    onClick = onOpenQueue,
+    modifier = Modifier.size(20.dp)
+)
         }
 
         Spacer(modifier = Modifier.height(48.dp))
