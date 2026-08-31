@@ -3,12 +3,9 @@ package app.vitune.android.ui.screens.player
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -40,22 +37,22 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SnapshotMutationPolicy
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -63,6 +60,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -103,7 +101,6 @@ import app.vitune.compose.routing.OnGlobalRoute
 import app.vitune.core.ui.Dimensions
 import app.vitune.core.ui.LocalAppearance
 import app.vitune.core.ui.ThumbnailRoundness
-import app.vitune.core.ui.collapsedPlayerProgressBar
 import app.vitune.core.ui.utils.isLandscape
 import app.vitune.core.ui.utils.px
 import app.vitune.core.ui.utils.roundedShape
@@ -112,151 +109,6 @@ import app.vitune.providers.innertube.models.NavigationEndpoint
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.absoluteValue
-import kotlin.math.floor
-import kotlin.math.roundToInt
-import kotlin.math.sqrt
-
-private const val MiniPlayerStarCount = 55
-private const val MiniPlayerTwinkleCycleSeconds = 6.5f
-private const val MiniPlayerFrameIntervalMs = 40L
-private const val MiniPlayerShootingStarCycleSeconds = 4.2f
-
-private data class MiniPlayerStar(
-    val x: Float,
-    val y: Float,
-    val sizePx: Float,
-    val opacity: Float,
-    val twinklePattern: Int,
-    val twinkles: Boolean
-)
-
-private fun seededUnit(index: Int, multiplier: Int, offset: Int): Float =
-    (((index * multiplier + offset) % 1000 + 1000) % 1000) / 1000f
-
-private fun twinkleGlow(pattern: Int, timeSeconds: Float): Float {
-    val phase = (((timeSeconds / MiniPlayerTwinkleCycleSeconds) + pattern * 0.21f) % 1f)
-    val pulse = if (phase < 0.5f) phase * 2f else (1f - phase) * 2f
-    return pulse * pulse
-}
-
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMiniPlayerShootingStar(
-    timeSeconds: Float,
-    glowColor: Color
-) {
-    val cycle = floor(timeSeconds / MiniPlayerShootingStarCycleSeconds).toInt()
-    val progress = (timeSeconds % MiniPlayerShootingStarCycleSeconds) / MiniPlayerShootingStarCycleSeconds
-    val visibleProgress = progress.coerceIn(0f, 1f)
-    val fade = if (visibleProgress < 0.55f) 1f else (1f - ((visibleProgress - 0.55f) / 0.45f)).coerceIn(0f, 1f)
-    if (fade <= 0.01f) return
-
-    val startXFrac = 0.35f + seededUnit(cycle, 53, 11) * 0.35f
-    val start = Offset(size.width * startXFrac, -4f)
-    val direction = Offset(-1f / sqrt(2f), 1f / sqrt(2f))
-    val travel = size.maxDimension * 1.4f
-    val head = Offset(
-        x = start.x + direction.x * travel * visibleProgress,
-        y = start.y + direction.y * travel * visibleProgress
-    )
-
-    val tailLength = size.minDimension.coerceAtLeast(120f) * 0.9f
-    val segments = 5
-    repeat(segments) { segment ->
-        val startFactor = segment / segments.toFloat()
-        val endFactor = (segment + 1) / segments.toFloat()
-        val segStart = Offset(
-            x = head.x - direction.x * tailLength * startFactor,
-            y = head.y - direction.y * tailLength * startFactor
-        )
-        val segEnd = Offset(
-            x = head.x - direction.x * tailLength * endFactor,
-            y = head.y - direction.y * tailLength * endFactor
-        )
-        val segAlpha = fade * (1f - startFactor).coerceIn(0f, 1f)
-        drawLine(
-            color = glowColor.copy(alpha = segAlpha * 0.55f),
-            start = segStart,
-            end = segEnd,
-            strokeWidth = 1.6f
-        )
-    }
-
-    drawCircle(color = Color.White.copy(alpha = fade), radius = 1.6f, center = head)
-}
-
-@Composable
-private fun MiniPlayerGalaxyBackground(
-    modifier: Modifier = Modifier,
-    meshPalette: MeshPalette
-) {
-    val stars = remember {
-        List(MiniPlayerStarCount) { index ->
-            MiniPlayerStar(
-                x = seededUnit(index, 29, 7),
-                y = seededUnit(index, 47, 13),
-                sizePx = if (seededUnit(index, 17, 3) < 0.6f) 1.2f else 2f,
-                opacity = 0.35f + seededUnit(index, 71, 19) * 0.45f,
-                twinklePattern = (index * 11 + 5) % 4,
-                twinkles = (index * 23 + 3) % 5 == 0
-            )
-        }
-    }
-
-    var frameMillis by remember { mutableLongStateOf(0L) }
-
-    val skyColors = meshPalette.toGalaxySky()
-
-    val topColor by animateColorAsState(skyColors.getOrElse(0) { Color(0xFF1A0B3D) }, tween(900), label = "gTop")
-    val midColor by animateColorAsState(skyColors.getOrElse(1) { Color(0xFF2D1465) }, tween(900), label = "gMid")
-    val bottomColor by animateColorAsState(skyColors.getOrElse(2) { Color(0xFF0A0420) }, tween(900), label = "gBottom")
-    val glowColor by animateColorAsState(skyColors.getOrElse(3) { Color.White }, tween(900), label = "gGlow")
-
-    LaunchedEffect(Unit) {
-        var lastDrawn = 0L
-        while (true) {
-            val next = withFrameMillis { it }
-            if (next - lastDrawn >= MiniPlayerFrameIntervalMs || next < lastDrawn) {
-                lastDrawn = next
-                frameMillis = next
-            }
-        }
-    }
-
-    Canvas(modifier = modifier) {
-        val timeSeconds = frameMillis / 1000f
-
-        drawRect(
-            brush = Brush.verticalGradient(
-                0f to topColor.copy(alpha = 0.85f),
-                0.6f to midColor.copy(alpha = 0.85f),
-                1f to bottomColor.copy(alpha = 0.85f)
-            ),
-            size = size
-        )
-
-        stars.forEach { star ->
-            val center = Offset(size.width * star.x, size.height * star.y)
-            val coreRadius = star.sizePx / 2f
-            val coreAlpha = star.opacity
-            val glowAlpha = if (star.twinkles) coreAlpha * twinkleGlow(star.twinklePattern, timeSeconds) else 0f
-
-            if (glowAlpha > 0.02f) {
-                drawCircle(
-                    color = glowColor.copy(alpha = glowAlpha * 0.16f),
-                    radius = coreRadius + 3f,
-                    center = center
-                )
-            }
-
-            drawCircle(
-                color = Color.White.copy(alpha = coreAlpha),
-                radius = coreRadius,
-                center = center
-            )
-        }
-
-        drawMiniPlayerShootingStar(timeSeconds = timeSeconds, glowColor = glowColor)
-    }
-}
 
 @Composable
 fun Player(
@@ -282,6 +134,7 @@ fun Player(
         )
     }
     var shouldBePlaying by remember(binder) { mutableStateOf(binder?.player?.shouldBePlaying == true) }
+
     var likedAt by remember(mediaItem) {
         mutableStateOf(
             value = null,
@@ -334,7 +187,6 @@ fun Player(
     OnGlobalRoute { if (layoutState.expanded) layoutState.collapseSoft() }
 
     val miniPlayerShape = RoundedCornerShape(28.dp)
-    val artworkColors = rememberArtworkColors(imageUrl = metadata?.artworkUri?.toString())
 
     if (mediaItem != null) BottomSheet(
         state = layoutState,
@@ -364,53 +216,87 @@ fun Player(
                     .then(innerModifier)
                     .padding(horizontalBottomPaddingValues)
             ) {
-                MiniPlayerGalaxyBackground(
-                    modifier = Modifier.matchParentSize(),
-                    meshPalette = artworkColors
-                )
-
-                Box(
-                    modifier = Modifier
-                        .matchParentSize()
-                        .drawBehind {
-                            drawRect(
-                                color = colorPalette.collapsedPlayerProgressBar,
-                                topLeft = Offset.Zero,
-                                size = Size(
-                                    width = runCatching {
-                                        size.width * (position.toFloat() / duration.absoluteValue)
-                                    }.getOrElse { 0f },
-                                    height = size.height
-                                )
-                            )
-                        }
-                )
-
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(14.dp),
-                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 14.dp)
+                        .padding(horizontal = 12.dp)
                 ) {
-                    Spacer(modifier = Modifier.width(2.dp))
-
+                    // Circular play/pause button with progress ring
                     Box(
                         contentAlignment = Alignment.Center,
-                        modifier = Modifier.height(Dimensions.items.collapsedPlayerHeight)
+                        modifier = Modifier
+                            .size(46.dp)
+                            .drawWithContent {
+                                drawContent()
+
+                                val progress = runCatching {
+                                    (position.toFloat() / duration.absoluteValue).coerceIn(0f, 1f)
+                                }.getOrElse { 0f }
+
+                                val stroke = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                                val diameter = size.minDimension
+                                val topLeft = Offset(
+                                    x = (size.width - diameter) / 2f,
+                                    y = (size.height - diameter) / 2f
+                                )
+
+                                drawArc(
+                                    color = colorPalette.text.copy(alpha = 0.15f),
+                                    startAngle = 0f,
+                                    sweepAngle = 360f,
+                                    useCenter = false,
+                                    topLeft = topLeft,
+                                    size = Size(diameter, diameter),
+                                    style = stroke
+                                )
+                                drawArc(
+                                    color = colorPalette.text,
+                                    startAngle = -90f,
+                                    sweepAngle = 360f * progress,
+                                    useCenter = false,
+                                    topLeft = topLeft,
+                                    size = Size(diameter, diameter),
+                                    style = stroke
+                                )
+                            }
+                            .clip(CircleShape)
+                            .clickable(
+                                indication = ripple(bounded = false),
+                                interactionSource = remember { MutableInteractionSource() },
+                                onClick = {
+                                    if (shouldBePlaying) binder?.player?.pause()
+                                    else {
+                                        if (binder?.player?.playbackState == Player.STATE_IDLE) binder.player.prepare()
+                                        binder?.player?.play()
+                                    }
+                                }
+                            )
                     ) {
                         AsyncImage(
                             model = metadata?.artworkUri?.thumbnail(Dimensions.thumbnails.song.px),
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
                                 .background(colorPalette.background0)
-                                .size(42.dp)
+                        )
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = if (shouldBePlaying) 0f else 0.35f))
+                        )
+                        if (!shouldBePlaying) AnimatedPlayPauseButton(
+                            playing = shouldBePlaying,
+                            modifier = Modifier.size(16.dp)
                         )
                     }
 
+                    // Title / artist
                     Column(
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier
@@ -429,7 +315,6 @@ fun Player(
                                 overflow = TextOverflow.Ellipsis
                             )
                         }
-
                         AnimatedVisibility(visible = metadata?.artist != null) {
                             AnimatedContent(
                                 targetState = metadata?.artist?.toString().orEmpty(),
@@ -446,7 +331,6 @@ fun Player(
                                         maxLines = 1,
                                         overflow = TextOverflow.Ellipsis
                                     )
-
                                     AnimatedVisibility(visible = extras?.explicit == true) {
                                         Image(
                                             painter = painterResource(R.drawable.explicit),
@@ -460,67 +344,30 @@ fun Player(
                         }
                     }
 
-                    Spacer(modifier = Modifier.width(2.dp))
-
-                    Row(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.height(Dimensions.items.collapsedPlayerHeight)
-                    ) {
-                        AnimatedVisibility(visible = isShowingPrevButtonCollapsed) {
-                            IconButton(
-                                icon = R.drawable.play_skip_back,
-                                color = colorPalette.text,
-                                onClick = { binder?.player?.forceSeekToPrevious() },
-                                modifier = Modifier
-                                    .padding(horizontal = 4.dp, vertical = 8.dp)
-                           
-                                    .size(20.dp)
+                    // Favorite heart
+                    BasicText(
+                        text = if (likedAt != null) "♥" else "♡",
+                        style = typography.xs.semiBold.copy(
+                            fontSize = 22.sp,
+                            color = if (likedAt != null) Color(0xFFE0245E) else colorPalette.text.copy(alpha = 0.55f)
+                        ),
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .clickable(
+                                indication = ripple(bounded = false),
+                                interactionSource = remember { MutableInteractionSource() },
+                                onClick = {
+                                    likedAt = if (likedAt == null) System.currentTimeMillis() else null
+                                }
                             )
-                        }
-
-                        Box(
-                            modifier = Modifier
-                                .clickable(
-                                    onClick = {
-                                        if (shouldBePlaying) binder?.player?.pause()
-                                        else {
-                                            if (binder?.player?.playbackState == Player.STATE_IDLE) binder.player.prepare()
-                                            binder?.player?.play()
-                                        }
-                                    },
-                                    indication = ripple(bounded = false),
-                                    interactionSource = remember { MutableInteractionSource() }
-                                )
-                                .clip(CircleShape)
-                        ) {
-                            AnimatedPlayPauseButton(
-                                playing = shouldBePlaying,
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .padding(horizontal = 4.dp, vertical = 8.dp)
-                                    .size(23.dp)
-                            )
-                        }
-
-                        IconButton(
-                            icon = R.drawable.play_skip_forward,
-                            color = colorPalette.text,
-                            onClick = { binder?.player?.forceSeekToNext() },
-                            modifier = Modifier
-                                .padding(horizontal = 4.dp, vertical = 8.dp)
-                                .size(20.dp)
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.width(2.dp))
+                            .padding(8.dp)
+                    )
                 }
             }
         }
     ) {
         var isShowingStatsForNerds by rememberSaveable { mutableStateOf(false) }
         var isShowingLyricsDialog by rememberSaveable { mutableStateOf(false) }
-
         if (isShowingLyricsDialog) LyricsDialog(onDismiss = { isShowingLyricsDialog = false })
 
         val playerBottomSheetState = rememberBottomSheetState(
@@ -598,7 +445,7 @@ fun Player(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                    .weight(0.66f)
+                               .weight(0.66f)
                     .padding(bottom = 16.dp)
             ) {
                 thumbnailContent(Modifier.padding(horizontal = 16.dp))
@@ -649,7 +496,6 @@ fun Player(
                 steps = 39,
                 label = stringResource(R.string.playback_speed)
             )
-
             SliderDialogBody(
                 provideState = { remember(pitch) { mutableFloatStateOf(pitch) } },
                 onSlideComplete = { pitch = it },
@@ -662,7 +508,6 @@ fun Player(
                 steps = 39,
                 label = stringResource(R.string.playback_pitch)
             )
-
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -695,7 +540,6 @@ fun Player(
                 SliderDialogBody(
                     provideState = {
                         val state = remember { mutableFloatStateOf(0f) }
-
                         LaunchedEffect(mediaItem) {
                             mediaItem?.mediaId?.let { mediaId ->
                                 Database
@@ -704,7 +548,6 @@ fun Player(
                                     .collect { state.floatValue = it ?: 0f }
                             }
                         }
-
                         state
                     },
                     onSlideComplete = { submit(it) },
@@ -712,7 +555,6 @@ fun Player(
                     max = 20f,
                     toDisplay = { stringResource(R.string.format_db, "%.2f".format(it)) }
                 )
-
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
