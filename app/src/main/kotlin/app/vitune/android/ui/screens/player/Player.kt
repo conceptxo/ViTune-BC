@@ -209,7 +209,8 @@ fun Player(
                             }
                         ) else modifier
                     }
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .height(64.dp)
                     .padding(horizontal = 14.dp, vertical = 10.dp)
                     .clip(miniPlayerShape)
                     .background(colorPalette.background1)
