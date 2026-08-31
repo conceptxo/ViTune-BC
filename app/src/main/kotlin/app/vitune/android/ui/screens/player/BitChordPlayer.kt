@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
@@ -142,16 +143,6 @@ fun BitChordPlayer(
 
                         isFetchingLyrics = true
 
-                        var trackDuration = withContext(Dispatchers.Main) {
-                            binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET
-                        }
-                        while (trackDuration == C.TIME_UNSET) {
-                            delay(100)
-                            trackDuration = withContext(Dispatchers.Main) {
-                                binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET
-                            }
-                        }
-
                         val album = metadata.albumTitle?.toString()
                         val artist = metadata.artist?.toString().orEmpty()
                         val title = metadata.title?.toString().orEmpty().let {
@@ -162,69 +153,89 @@ fun BitChordPlayer(
                         }
                         val strippedTitle = title.split("(")[0].trim()
 
-                        val fixed = coroutineScope {
+                        coroutineScope {
+                            // Duration is only needed by the LrcLib/KuGou calls,
+                            // not by Innertube — so it's fetched once, in
+                            // parallel, instead of blocking every provider
+                            // (including Innertube) behind it up front.
+                            val durationDeferred = async {
+                                var d = withContext(Dispatchers.Main) {
+                                    binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET
+                                }
+                                while (d == C.TIME_UNSET) {
+                                    delay(100)
+                                    d = withContext(Dispatchers.Main) {
+                                        binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET
+                                    }
+                                }
+                                d
+                            }
+
                             val innertube = async(Dispatchers.IO) {
                                 runCatching {
                                     Innertube.lyrics(NextBody(videoId = mediaItem.mediaId))?.getOrNull()
                                 }.getOrNull()
                             }
-                            val lrcPlain = async(Dispatchers.IO) {
+
+                            val fixed = currentLyrics?.fixed ?: innertube.await() ?: run {
+                                val d = durationDeferred.await()
                                 runCatching {
                                     LrcLib.bestLyrics(
                                         artist = artist,
                                         title = title,
-                                        duration = trackDuration.milliseconds,
+                                        duration = d.milliseconds,
                                         album = album,
                                         synced = false
                                     )?.map { it?.text }?.getOrNull()
                                 }.getOrNull()
                             }
-                            currentLyrics?.fixed ?: innertube.await() ?: lrcPlain.await()
-                        }
 
-                        val synced = coroutineScope {
-                            val lrcMain = async(Dispatchers.IO) {
-                                runCatching {
-                                    LrcLib.bestLyrics(
-                                        artist = artist,
-                                        title = title,
-                                        duration = trackDuration.milliseconds,
-                                        album = album
-                                    )?.map { it?.text }?.getOrNull()
-                                }.getOrNull()
-                            }
-                            val lrcRetry = async(Dispatchers.IO) {
-                                runCatching {
-                                    LrcLib.bestLyrics(
-                                        artist = artist,
-                                        title = strippedTitle,
-                                        duration = trackDuration.milliseconds,
-                                        album = album
-                                    )?.map { it?.text }?.getOrNull()
-                                }.getOrNull()
-                            }
-                            val kugou = async(Dispatchers.IO) {
-                                runCatching {
-                                    KuGou.lyrics(
-                                        artist = artist,
-                                        title = title,
-                                        duration = trackDuration / 1000
-                                    )?.map { it?.value }?.getOrNull()
-                                }.getOrNull()
-                            }
-                            currentLyrics?.synced ?: lrcMain.await() ?: lrcRetry.await() ?: kugou.await()
-                        }
+                            val synced = currentLyrics?.synced ?: run {
+                                val d = durationDeferred.await()
 
-                        LyricsData(
-                            songId = mediaItem.mediaId,
-                            fixed = fixed.orEmpty(),
-                            synced = synced.orEmpty()
-                        ).also {
-                            ensureActive()
-                            transaction {
-                                runCatching {
-                                    Database.insert(mediaItem)
-                                    Database.upsert(it)
+                                val lrcMain = async(Dispatchers.IO) {
+                                    runCatching {
+                                        LrcLib.bestLyrics(
+                                            artist = artist,
+                                            title = title,
+                                            duration = d.milliseconds,
+                                            album = album
+                                        )?.map { it?.text }?.getOrNull()
+                                    }.getOrNull()
+                                }
+                                val lrcRetry = async(Dispatchers.IO) {
+                                    runCatching {
+                                        LrcLib.bestLyrics(
+                                            artist = artist,
+                                            title = strippedTitle,
+                                            duration = d.milliseconds,
+                                            album = album
+                                        )?.map { it?.text }?.getOrNull()
+                                    }.getOrNull()
+                                }
+                                val kugou = async(Dispatchers.IO) {
+                                    runCatching {
+                                        KuGou.lyrics(
+                                            artist = artist,
+                                            title = title,
+                                            duration = d / 1000
+                                        )?.map { it?.value }?.getOrNull()
+                                    }.getOrNull()
+                                }
+                                lrcMain.await() ?: lrcRetry.await() ?: kugou.await()
+                            }
+
+                            LyricsData(
+                                songId = mediaItem.mediaId,
+                                fixed = fixed.orEmpty(),
+                                synced = synced.orEmpty()
+                            ).also {
+                                ensureActive()
+                                transaction {
+                                    runCatching {
+                                        Database.insert(mediaItem)
+                                        Database.upsert(it)
+                                    }
                                 }
                             }
                         }
@@ -266,9 +277,14 @@ fun BitChordPlayer(
         }
     }
 
-    val currentLyricLine = synchronizedLyrics?.let {
-        it.sentences.values.toImmutableList().getOrNull(it.index)?.takeIf { line -> line.isNotBlank() }
+    // Raw current sentence, not filtered — distinguishes "no lyric line
+    // here" (blank, an instrumental gap the source explicitly marked) from
+    // "nothing has loaded at all" (null, no line exists at this index yet).
+    val currentSentenceRaw = synchronizedLyrics?.let {
+        it.sentences.values.toImmutableList().getOrNull(it.index)
     }
+    val currentLyricLine = currentSentenceRaw?.takeIf { it.isNotBlank() }
+    val isInstrumentalGap = currentSentenceRaw != null && currentSentenceRaw.isBlank()
 
     var searchPhraseIndex by remember(mediaItem.mediaId) { mutableIntStateOf(0) }
     LaunchedEffect(mediaItem.mediaId, isFetchingLyrics) {
@@ -279,9 +295,11 @@ fun BitChordPlayer(
         }
     }
 
-    val showLoadingGlyph = isFetchingLyrics && currentLyricLine == null
+    val showSearchingGlyph = isFetchingLyrics && currentLyricLine == null && !isInstrumentalGap
+    val showNoteGlyph = showSearchingGlyph || isInstrumentalGap
     val lyricStripText = when {
         currentLyricLine != null -> currentLyricLine
+        isInstrumentalGap -> "Instrumental"
         isFetchingLyrics -> LYRIC_SEARCH_PHRASES[searchPhraseIndex]
         else -> "Tap for lyrics"
     }
@@ -368,32 +386,29 @@ fun BitChordPlayer(
                 .clickable { onShowLyrics(true) }
                 .padding(vertical = 10.dp)
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                modifier = Modifier.weight(1f)
-            ) {
-                if (showLoadingGlyph) {
-                    Image(
-                        painter = painterResource(R.drawable.musical_notes),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(colorPalette.text.copy(alpha = 0.6f)),
-                        modifier = Modifier.size(12.dp)
-                    )
-                }
-                AnimatedContent(
-                    targetState = lyricStripText,
-                    transitionSpec = { fadeIn() togetherWith fadeOut() },
-                    label = "inlineLyricLine"
-                ) { line ->
-                    BasicText(
-                        text = line,
-                        style = typography.xs.semiBold.secondary,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+            if (showNoteGlyph) {
+                Image(
+                    painter = painterResource(R.drawable.musical_notes),
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(colorPalette.text.copy(alpha = 0.6f)),
+                    modifier = Modifier.size(12.dp)
+                )
+                Spacer(modifier = Modifier.width(6.dp))
             }
+            AnimatedContent(
+                targetState = lyricStripText,
+                transitionSpec = { fadeIn() togetherWith fadeOut() },
+                label = "inlineLyricLine",
+                modifier = Modifier.weight(1f, fill = false)
+            ) { line ->
+                BasicText(
+                    text = line,
+                    style = typography.xs.semiBold.secondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Spacer(modifier = Modifier.width(4.dp))
             BasicText(
                 text = "\u203A",
                 style = typography.xs.semiBold.secondary
@@ -467,7 +482,7 @@ fun BitChordPlayer(
             ) {
                 BasicText(
                     text = "Shuffle",
-                    style = typography.xxs.semiBold.let {
+                                    style = typography.xxs.semiBold.let {
                         if (shuffleOn) it.copy(color = colorPalette.accent) else it.secondary
                     }
                 )
