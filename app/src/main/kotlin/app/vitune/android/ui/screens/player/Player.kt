@@ -3,9 +3,12 @@ package app.vitune.android.ui.screens.player
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -37,11 +40,13 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SnapshotMutationPolicy
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.neverEqualPolicy
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -107,6 +112,110 @@ import app.vitune.providers.innertube.models.NavigationEndpoint
 import coil3.compose.AsyncImage
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlin.math.absoluteValue
+import kotlin.math.floor
+import kotlin.math.roundToInt
+import kotlin.math.sqrt
+
+// ============================================================================
+// Lightweight twinkling starfield used behind the floating mini player pill.
+// Colors come from rememberArtworkColors() in ArtworkMesh.kt (untouched).
+// ============================================================================
+
+private const val MiniPlayerStarCount = 36
+private const val MiniPlayerTwinkleCycleSeconds = 6.5f
+private const val MiniPlayerFrameIntervalMs = 40L
+
+private data class MiniPlayerStar(
+    val x: Float,
+    val y: Float,
+    val sizePx: Float,
+    val opacity: Float,
+    val twinklePattern: Int,
+    val twinkles: Boolean
+)
+
+private fun seededUnit(index: Int, multiplier: Int, offset: Int): Float =
+    (((index * multiplier + offset) % 1000 + 1000) % 1000) / 1000f
+
+private fun twinkleGlow(pattern: Int, timeSeconds: Float): Float {
+    val phase = (((timeSeconds / MiniPlayerTwinkleCycleSeconds) + pattern * 0.21f) % 1f)
+    val pulse = if (phase < 0.5f) phase * 2f else (1f - phase) * 2f
+    return pulse * pulse
+}
+
+@Composable
+private fun MiniPlayerGalaxyBackground(
+    modifier: Modifier = Modifier,
+    meshPalette: MeshPalette
+) {
+    val stars = remember {
+        List(MiniPlayerStarCount) { index ->
+            MiniPlayerStar(
+                x = seededUnit(index, 29, 7),
+                y = seededUnit(index, 47, 13),
+                sizePx = if (seededUnit(index, 17, 3) < 0.6f) 1.2f else 2f,
+                opacity = 0.35f + seededUnit(index, 71, 19) * 0.45f,
+                twinklePattern = (index * 11 + 5) % 4,
+                twinkles = (index * 23 + 3) % 5 == 0
+            )
+        }
+    }
+
+    var frameMillis by remember { mutableLongStateOf(0L) }
+
+    val skyColors = meshPalette.colors.ifEmpty {
+        listOf(Color(0xFF120018), Color(0xFF1B0330), Color(0xFF05010A), Color.White)
+    }
+
+    val topColor by animateColorAsState(skyColors.getOrElse(0) { Color(0xFF120018) }, tween(900), label = "gTop")
+    val midColor by animateColorAsState(skyColors.getOrElse(1) { Color(0xFF1B0330) }, tween(900), label = "gMid")
+    val bottomColor by animateColorAsState(skyColors.getOrElse(2) { Color(0xFF05010A) }, tween(900), label = "gBottom")
+    val glowColor by animateColorAsState(skyColors.getOrElse(3) { Color.White }, tween(900), label = "gGlow")
+
+    LaunchedEffect(Unit) {
+        var lastDrawn = 0L
+        while (true) {
+            val next = withFrameMillis { it }
+            if (next - lastDrawn >= MiniPlayerFrameIntervalMs || next < lastDrawn) {
+                lastDrawn = next
+                frameMillis = next
+            }
+        }
+    }
+
+    Canvas(modifier = modifier) {
+        val timeSeconds = frameMillis / 1000f
+
+        drawRect(
+            brush = Brush.verticalGradient(
+                0f to topColor.copy(alpha = 0.55f),
+                0.6f to midColor.copy(alpha = 0.55f),
+                1f to bottomColor.copy(alpha = 0.55f)
+            ),
+            size = size
+        )
+
+        stars.forEach { star ->
+            val center = Offset(size.width * star.x, size.height * star.y)
+            val coreRadius = star.sizePx / 2f
+            val coreAlpha = star.opacity
+            val glowAlpha = if (star.twinkles) coreAlpha * twinkleGlow(star.twinklePattern, timeSeconds) else 0f
+
+            if (glowAlpha > 0.02f) {
+                drawCircle(
+                    color = glowColor.copy(alpha = glowAlpha * 0.16f),
+                    radius = coreRadius + 3f,
+                    center = center
+                )
+            }
+            drawCircle(
+                color = Color.White.copy(alpha = coreAlpha),
+                radius = coreRadius,
+                center = center
+            )
+        }
+    }
+}
 
 @Composable
 fun Player(
@@ -185,8 +294,11 @@ fun Player(
 
     OnGlobalRoute { if (layoutState.expanded) layoutState.collapseSoft() }
 
-    // Pill shape used only for the floating mini player bar
-    val miniPlayerShape = RoundedCornerShape(percent = 50)
+    // Fixed, moderate corner radius (not a full stadium) so the circular
+    // thumbnail always has room to sit fully inside the curve.
+    val miniPlayerShape = RoundedCornerShape(28.dp)
+
+    val artworkColors = rememberArtworkColors(imageUrl = metadata?.artworkUri?.toString())
 
     if (mediaItem != null) BottomSheet(
         state = layoutState,
@@ -197,9 +309,7 @@ fun Player(
         },
         backHandlerEnabled = !menuState.isDisplayed,
         collapsedContent = { innerModifier ->
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.Top,
+            Box(
                 modifier = Modifier
                     .let { modifier ->
                         if (horizontalSwipeToClose) modifier.onSwipe(
@@ -212,35 +322,40 @@ fun Player(
                         ) else modifier
                     }
                     .fillMaxSize()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .padding(horizontal = 14.dp, vertical = 10.dp)
                     .clip(miniPlayerShape)
-                    .background(
-                        Brush.verticalGradient(
-                            0f to colorPalette.background1.copy(alpha = 0.92f),
-                            1f to colorPalette.background0.copy(alpha = 0.80f)
-                        )
-                    )
-                    .border(
-                        width = 1.dp,
-                        color = Color.White.copy(alpha = 0.08f),
-                        shape = miniPlayerShape
-                    )
-                    .drawBehind {
-                        drawRect(
-                            color = colorPalette.collapsedPlayerProgressBar,
-                            topLeft = Offset.Zero,
-                            size = Size(
-                                width = runCatching {
-                                    size.width * (position.toFloat() / duration.absoluteValue)
-                                }.getOrElse { 0f },
-                                height = size.height
-                            )
-                        )
-                    }
+                    .background(colorPalette.background1)
                     .then(innerModifier)
                     .padding(horizontalBottomPaddingValues)
-                    .padding(horizontal = 8.dp)
             ) {
+                MiniPlayerGalaxyBackground(
+                    modifier = Modifier.matchParentSize(),
+                    meshPalette = artworkColors
+                )
+                Box(
+                    modifier = Modifier
+                        .matchParentSize()
+                        .drawBehind {
+                            drawRect(
+                                color = colorPalette.collapsedPlayerProgressBar,
+                                topLeft = Offset.Zero,
+                                size = Size(
+                                    width = runCatching {
+                                        size.width * (position.toFloat() / duration.absoluteValue)
+                                    }.getOrElse { 0f },
+                                    height = size.height
+                                )
+                            )
+                        }
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                    verticalAlignment = Alignment.Top,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 14.dp)
+                ) {
                 Spacer(modifier = Modifier.width(2.dp))
 
                 Box(
@@ -253,8 +368,9 @@ fun Player(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
                             .clip(CircleShape)
+                            .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
                             .background(colorPalette.background0)
-                            .size(44.dp)
+                            .size(42.dp)
                     )
                 }
 
@@ -359,6 +475,7 @@ fun Player(
                 }
 
                 Spacer(modifier = Modifier.width(2.dp))
+                }
             }
         }
     ) {
@@ -468,7 +585,7 @@ fun Player(
                 setLikedAt = { likedAt = it },
                 isShowingLyrics = isShowingLyrics,
                 onShowLyrics = { isShowingLyrics = it },
-                    onOpenQueue = {},
+                onOpenQueue = {},
                 modifier = Modifier
                     .padding(vertical = 8.dp)
                     .fillMaxWidth()
