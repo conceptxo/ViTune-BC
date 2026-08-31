@@ -273,7 +273,7 @@ fun LocalPlaylistSongs(
                                             )
 
                                             MenuEntry(
-                                                icon = R.drawable.image,
+                                                icon = R.drawable.disc,
                                                 text = "Change cover",
                                                 onClick = {
                                                     menuState.hide()
