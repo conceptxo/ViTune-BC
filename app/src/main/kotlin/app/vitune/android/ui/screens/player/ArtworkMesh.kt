@@ -209,3 +209,26 @@ private fun Color.dimmed(): Color {
     hsl[2] = 0.12f
     return Color(ColorUtils.HSLToColor(hsl))
 }
+
+fun MeshPalette.toGalaxySky(): List<Color> {
+    val source = colors.ifEmpty { FallbackColors }
+    val seedHsl = source.first().hsl()
+    val secondaryHsl = source.getOrElse(1) { source.first() }.hsl()
+
+    fun sky(hue: Float, saturation: Float, lightness: Float): Color = Color(
+        ColorUtils.HSLToColor(
+            floatArrayOf(hue, saturation.coerceIn(0f, 1f), lightness.coerceIn(0f, 1f))
+        )
+    )
+
+    val hue = seedHsl[0]
+    val secondaryHue = secondaryHsl[0]
+
+    val top = sky(hue, 0.55f, 0.14f)
+    val mid = sky(secondaryHue, 0.50f, 0.24f)
+    val bottom = sky(hue, 0.45f, 0.05f)
+    val glow = sky(hue, 0.35f, 0.85f)
+
+    return listOf(top, mid, bottom, glow)
+}
+
