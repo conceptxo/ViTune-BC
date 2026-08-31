@@ -8,6 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
@@ -48,6 +49,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
@@ -183,6 +185,9 @@ fun Player(
 
     OnGlobalRoute { if (layoutState.expanded) layoutState.collapseSoft() }
 
+    // Pill shape used only for the floating mini player bar
+    val miniPlayerShape = RoundedCornerShape(percent = 50)
+
     if (mediaItem != null) BottomSheet(
         state = layoutState,
         modifier = modifier.fillMaxSize(),
@@ -207,8 +212,19 @@ fun Player(
                         ) else modifier
                     }
                     .fillMaxSize()
-                    .clip(shape)
-                    .background(colorPalette.background1)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .clip(miniPlayerShape)
+                    .background(
+                        Brush.verticalGradient(
+                            0f to colorPalette.background1.copy(alpha = 0.92f),
+                            1f to colorPalette.background0.copy(alpha = 0.80f)
+                        )
+                    )
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = 0.08f),
+                        shape = miniPlayerShape
+                    )
                     .drawBehind {
                         drawRect(
                             color = colorPalette.collapsedPlayerProgressBar,
@@ -223,6 +239,7 @@ fun Player(
                     }
                     .then(innerModifier)
                     .padding(horizontalBottomPaddingValues)
+                    .padding(horizontal = 8.dp)
             ) {
                 Spacer(modifier = Modifier.width(2.dp))
 
@@ -235,9 +252,9 @@ fun Player(
                         contentDescription = null,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier
-                            .clip(thumbnailCornerSize.coerceAtMost(ThumbnailRoundness.Heavy.dp).roundedShape)
+                            .clip(CircleShape)
                             .background(colorPalette.background0)
-                            .size(48.dp)
+                            .size(44.dp)
                     )
                 }
 
@@ -441,22 +458,23 @@ fun Player(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = containerModifier.padding(top = 54.dp)
         ) {
-BitChordPlayer(
-    mediaItem = mediaItem!!,
-    binder = binder!!,
-    shouldBePlaying = shouldBePlaying,
-    position = position,
-    duration = duration,
-    likedAt = likedAt,
-    setLikedAt = { likedAt = it },
-    isShowingLyrics = isShowingLyrics,
-    onShowLyrics = { isShowingLyrics = it },
-    onOpenQueue = {},
-    modifier = Modifier
-        .padding(vertical = 8.dp)
-        .fillMaxWidth()
-        .weight(1f)
-)}
+            BitChordPlayer(
+                mediaItem = mediaItem!!,
+                binder = binder!!,
+                shouldBePlaying = shouldBePlaying,
+                position = position,
+                duration = duration,
+                likedAt = likedAt,
+                setLikedAt = { likedAt = it },
+                isShowingLyrics = isShowingLyrics,
+                onShowLyrics = { isShowingLyrics = it },
+                    onOpenQueue = {},
+                modifier = Modifier
+                    .padding(vertical = 8.dp)
+                    .fillMaxWidth()
+                    .weight(1f)
+            )
+        }
         var audioDialogOpen by rememberSaveable { mutableStateOf(false) }
 
         if (audioDialogOpen) SliderDialog(
