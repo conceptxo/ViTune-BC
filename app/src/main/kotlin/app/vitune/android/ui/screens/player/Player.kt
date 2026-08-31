@@ -472,7 +472,19 @@ fun Player(
                 setLikedAt = { likedAt = it },
                 isShowingLyrics = isShowingLyrics,
                 onShowLyrics = { isShowingLyrics = it },
-                onOpenQueue = {},
+onOpenQueue = {
+    menuState.display {
+        PlayerMenu(
+            onDismiss = menuState::hide,
+            mediaItem = mediaItem!!,
+            binder = binder!!,
+            onShowSpeedDialog = { audioDialogOpen = true },
+            onShowNormalizationDialog = {
+                boostDialogOpen = true
+            }.takeIf { volumeNormalization }
+        )
+    }
+},
                 modifier = Modifier
                     .padding(vertical = 8.dp)
                     .fillMaxWidth()
