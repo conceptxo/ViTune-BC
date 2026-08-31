@@ -157,9 +157,9 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMiniPlayerShoot
         x = start.x + direction.x * travel * visibleProgress,
         y = start.y + direction.y * travel * visibleProgress
     )
+
     val tailLength = size.minDimension.coerceAtLeast(120f) * 0.9f
     val segments = 5
-
     repeat(segments) { segment ->
         val startFactor = segment / segments.toFloat()
         val endFactor = (segment + 1) / segments.toFloat()
@@ -203,9 +203,7 @@ private fun MiniPlayerGalaxyBackground(
 
     var frameMillis by remember { mutableLongStateOf(0L) }
 
-    val skyColors = meshPalette.colors.ifEmpty {
-        listOf(Color(0xFF1A0B3D), Color(0xFF2D1465), Color(0xFF0A0420), Color.White)
-    }
+    val skyColors = meshPalette.toGalaxySky()
 
     val topColor by animateColorAsState(skyColors.getOrElse(0) { Color(0xFF1A0B3D) }, tween(900), label = "gTop")
     val midColor by animateColorAsState(skyColors.getOrElse(1) { Color(0xFF2D1465) }, tween(900), label = "gMid")
@@ -248,6 +246,7 @@ private fun MiniPlayerGalaxyBackground(
                     center = center
                 )
             }
+
             drawCircle(
                 color = Color.White.copy(alpha = coreAlpha),
                 radius = coreRadius,
@@ -272,7 +271,6 @@ fun Player(
     val menuState = LocalMenuState.current
     val (colorPalette, typography, thumbnailCornerSize) = LocalAppearance.current
     val binder = LocalPlayerServiceBinder.current
-
     val pipHandler = rememberPipHandler()
 
     PersistMapCleanup(prefix = "queue/suggestions")
@@ -284,7 +282,6 @@ fun Player(
         )
     }
     var shouldBePlaying by remember(binder) { mutableStateOf(binder?.player?.shouldBePlaying == true) }
-
     var likedAt by remember(mediaItem) {
         mutableStateOf(
             value = null,
@@ -337,7 +334,6 @@ fun Player(
     OnGlobalRoute { if (layoutState.expanded) layoutState.collapseSoft() }
 
     val miniPlayerShape = RoundedCornerShape(28.dp)
-
     val artworkColors = rememberArtworkColors(imageUrl = metadata?.artworkUri?.toString())
 
     if (mediaItem != null) BottomSheet(
@@ -372,6 +368,7 @@ fun Player(
                     modifier = Modifier.matchParentSize(),
                     meshPalette = artworkColors
                 )
+
                 Box(
                     modifier = Modifier
                         .matchParentSize()
@@ -396,125 +393,127 @@ fun Player(
                         .fillMaxSize()
                         .padding(horizontal = 14.dp)
                 ) {
-                Spacer(modifier = Modifier.width(2.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
 
-                Box(
-                    contentAlignment = Alignment.Center,
-                    modifier = Modifier.height(Dimensions.items.collapsedPlayerHeight)
-                ) {
-                    AsyncImage(
-                        model = metadata?.artworkUri?.thumbnail(Dimensions.thumbnails.song.px),
-                        contentDescription = null,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
-                            .background(colorPalette.background0)
-                            .size(42.dp)
-                    )
-                }
-
-                Column(
-                    verticalArrangement = Arrangement.Center,
-                    modifier = Modifier
-                        .height(Dimensions.items.collapsedPlayerHeight)
-                        .weight(1f)
-                ) {
-                    AnimatedContent(
-                        targetState = metadata?.title?.toString().orEmpty(),
-                        label = "",
-                        transitionSpec = { fadeIn() togetherWith fadeOut() }
-                    ) { text ->
-                        BasicText(
-                            text = text,
-                            style = typography.xs.semiBold,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
+                    Box(
+                        contentAlignment = Alignment.Center,
+                        modifier = Modifier.height(Dimensions.items.collapsedPlayerHeight)
+                    ) {
+                        AsyncImage(
+                            model = metadata?.artworkUri?.thumbnail(Dimensions.thumbnails.song.px),
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .clip(CircleShape)
+                                .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
+                                .background(colorPalette.background0)
+                                .size(42.dp)
                         )
                     }
-                    AnimatedVisibility(visible = metadata?.artist != null) {
+
+                    Column(
+                        verticalArrangement = Arrangement.Center,
+                        modifier = Modifier
+                            .height(Dimensions.items.collapsedPlayerHeight)
+                            .weight(1f)
+                    ) {
                         AnimatedContent(
-                            targetState = metadata?.artist?.toString().orEmpty(),
+                            targetState = metadata?.title?.toString().orEmpty(),
                             label = "",
                             transitionSpec = { fadeIn() togetherWith fadeOut() }
                         ) { text ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                BasicText(
-                                    text = text,
-                                    style = typography.xs.semiBold.secondary,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                            BasicText(
+                                text = text,
+                                style = typography.xs.semiBold,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
 
-                                AnimatedVisibility(visible = extras?.explicit == true) {
-                                    Image(
-                                        painter = painterResource(R.drawable.explicit),
-                                        contentDescription = null,
-                                        colorFilter = ColorFilter.tint(colorPalette.text),
-                                        modifier = Modifier.size(15.dp)
+                        AnimatedVisibility(visible = metadata?.artist != null) {
+                            AnimatedContent(
+                                targetState = metadata?.artist?.toString().orEmpty(),
+                                label = "",
+                                transitionSpec = { fadeIn() togetherWith fadeOut() }
+                            ) { text ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    BasicText(
+                                        text = text,
+                                        style = typography.xs.semiBold.secondary,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
                                     )
+
+                                    AnimatedVisibility(visible = extras?.explicit == true) {
+                                        Image(
+                                            painter = painterResource(R.drawable.explicit),
+                                            contentDescription = null,
+                                            colorFilter = ColorFilter.tint(colorPalette.text),
+                                            modifier = Modifier.size(15.dp)
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.width(2.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
 
-                Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.height(Dimensions.items.collapsedPlayerHeight)
-                ) {
-                    AnimatedVisibility(visible = isShowingPrevButtonCollapsed) {
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.height(Dimensions.items.collapsedPlayerHeight)
+                    ) {
+                        AnimatedVisibility(visible = isShowingPrevButtonCollapsed) {
+                            IconButton(
+                                icon = R.drawable.play_skip_back,
+                                color = colorPalette.text,
+                                onClick = { binder?.player?.forceSeekToPrevious() },
+                                modifier = Modifier
+                                    .padding(horizontal = 4.dp, vertical = 8.dp)
+                           
+                                    .size(20.dp)
+                            )
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .clickable(
+                                    onClick = {
+                                        if (shouldBePlaying) binder?.player?.pause()
+                                        else {
+                                            if (binder?.player?.playbackState == Player.STATE_IDLE) binder.player.prepare()
+                                            binder?.player?.play()
+                                        }
+                                    },
+                                    indication = ripple(bounded = false),
+                                    interactionSource = remember { MutableInteractionSource() }
+                                )
+                                .clip(CircleShape)
+                        ) {
+                            AnimatedPlayPauseButton(
+                                playing = shouldBePlaying,
+                                modifier = Modifier
+                                    .align(Alignment.Center)
+                                    .padding(horizontal = 4.dp, vertical = 8.dp)
+                                    .size(23.dp)
+                            )
+                        }
+
                         IconButton(
-                            icon = R.drawable.play_skip_back,
+                            icon = R.drawable.play_skip_forward,
                             color = colorPalette.text,
-                            onClick = { binder?.player?.forceSeekToPrevious() },
+                            onClick = { binder?.player?.forceSeekToNext() },
                             modifier = Modifier
                                 .padding(horizontal = 4.dp, vertical = 8.dp)
                                 .size(20.dp)
                         )
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .clickable(
-                                                              onClick = {
-                                    if (shouldBePlaying) binder?.player?.pause()
-                                    else {
-                                        if (binder?.player?.playbackState == Player.STATE_IDLE) binder.player.prepare()
-                                        binder?.player?.play()
-                                    }
-                                },
-                                indication = ripple(bounded = false),
-                                interactionSource = remember { MutableInteractionSource() }
-                            )
-                            .clip(CircleShape)
-                    ) {
-                        AnimatedPlayPauseButton(
-                            playing = shouldBePlaying,
-                            modifier = Modifier
-                                .align(Alignment.Center)
-                                .padding(horizontal = 4.dp, vertical = 8.dp)
-                                .size(23.dp)
-                        )
-                    }
-
-                    IconButton(
-                        icon = R.drawable.play_skip_forward,
-                        color = colorPalette.text,
-                        onClick = { binder?.player?.forceSeekToNext() },
-                        modifier = Modifier
-                            .padding(horizontal = 4.dp, vertical = 8.dp)
-                            .size(20.dp)
-                    )
-                }
-
-                Spacer(modifier = Modifier.width(2.dp))
+                    Spacer(modifier = Modifier.width(2.dp))
                 }
             }
         }
@@ -632,8 +631,8 @@ fun Player(
                     .weight(1f)
             )
         }
-        var audioDialogOpen by rememberSaveable { mutableStateOf(false) }
 
+        var audioDialogOpen by rememberSaveable { mutableStateOf(false) }
         if (audioDialogOpen) SliderDialog(
             onDismiss = { audioDialogOpen = false },
             title = stringResource(R.string.playback_settings)
@@ -650,6 +649,7 @@ fun Player(
                 steps = 39,
                 label = stringResource(R.string.playback_speed)
             )
+
             SliderDialogBody(
                 provideState = { remember(pitch) { mutableFloatStateOf(pitch) } },
                 onSlideComplete = { pitch = it },
@@ -662,6 +662,7 @@ fun Player(
                 steps = 39,
                 label = stringResource(R.string.playback_pitch)
             )
+
             Box(
                 modifier = Modifier.fillMaxWidth(),
                 contentAlignment = Alignment.Center
@@ -677,7 +678,6 @@ fun Player(
         }
 
         var boostDialogOpen by rememberSaveable { mutableStateOf(false) }
-
         if (boostDialogOpen) {
             fun submit(state: Float) = transaction {
                 mediaItem?.mediaId?.let { mediaId ->
@@ -712,6 +712,7 @@ fun Player(
                     max = 20f,
                     toDisplay = { stringResource(R.string.format_db, "%.2f".format(it)) }
                 )
+
                 Box(
                     modifier = Modifier.fillMaxWidth(),
                     contentAlignment = Alignment.Center
