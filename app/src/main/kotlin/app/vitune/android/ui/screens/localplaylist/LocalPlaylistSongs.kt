@@ -1,5 +1,9 @@
 package app.vitune.android.ui.screens.localplaylist
 
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
@@ -100,6 +104,20 @@ fun LocalPlaylistSongs(
     val lazyListState = rememberLazyListState()
 
     var loading by remember { mutableStateOf(false) }
+
+    val coverPickerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            query {
+                Database.update(playlist.copy(thumbnail = uri.toString()))
+            }
+        }
+    }
 
     LaunchedEffect(Unit) {
         if (DataPreferences.autoSyncPlaylists) playlist.browseId?.let { browseId ->
@@ -251,6 +269,17 @@ fun LocalPlaylistSongs(
                                                 onClick = {
                                                     menuState.hide()
                                                     isRenaming = true
+                                                }
+                                            )
+
+                                            MenuEntry(
+                                                icon = R.drawable.image,
+                                                text = "Change cover",
+                                                onClick = {
+                                                    menuState.hide()
+                                                    coverPickerLauncher.launch(
+                                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                    )
                                                 }
                                             )
 
