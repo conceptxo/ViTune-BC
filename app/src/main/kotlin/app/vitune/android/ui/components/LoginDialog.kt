@@ -2,6 +2,7 @@ package app.vitune.android.ui.components
 
 import android.annotation.SuppressLint
 import android.webkit.CookieManager
+import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,7 +29,11 @@ fun LoginDialog(
             factory = { context ->
                 WebView(context).apply {
                     settings.javaScriptEnabled = true
-                    settings.userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                    settings.domStorageEnabled = true
+                    settings.setSupportMultipleWindows(false)
+                    settings.userAgentString = "Mozilla/5.0 (Linux; Android 10) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+                    
+                    webChromeClient = WebChromeClient()
                     
                     webViewClient = object : WebViewClient() {
                         override fun onPageFinished(view: WebView?, url: String?) {
@@ -46,4 +51,3 @@ fun LoginDialog(
         )
     }
 }
-
