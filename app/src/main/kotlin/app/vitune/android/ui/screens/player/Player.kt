@@ -44,6 +44,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -53,6 +54,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
@@ -60,7 +62,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.coerceAtMost
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -106,24 +107,16 @@ import app.vitune.core.ui.utils.px
 import app.vitune.core.ui.utils.roundedShape
 import app.vitune.core.ui.utils.songBundle
 import app.vitune.providers.innertube.models.NavigationEndpoint
-import coil3.compose.AsyncImage
-import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlin.math.absoluteValue
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
 
-@Composable
-fun Player(
-    layoutState: BottomSheetState,
-    modifier: Modifier = Modifier,
-    shape: RoundedCornerShape = RoundedCornerShape(
-        topStart = 12.dp,
-        topEnd = 12.dp
-    ),
-    windowInsets: WindowInsets = WindowInsets.systemBars
-) = with(PlayerPreferences) {
-    val menuState = LocalMenuState.current
-    val (colorPalette, typography, thumbnailCornerSize) = LocalAppearance.current
-    val binder = LocalPlayerServiceBinder.current
-    val pipHandler = rememberPipHandler()
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M12,3C7.03,3 3,7.03 3,12v5c0,1.1 0.9,2 2,2h2v-7H5v-0.01C5,8.13 8.13,5 12,5s7,3.13 7,6.99V12h-2v7h2c1.1,0 2,-0.9 2,-2v-5c0,-4.97 -4.03,-9 -9,-9zM7,12h2v7H7v-7zM15,12h2v7h-2v-7z" />
+</vector>
 
     PersistMapCleanup(prefix = "queue/suggestions")
 
@@ -186,7 +179,7 @@ fun Player(
 
     OnGlobalRoute { if (layoutState.expanded) layoutState.collapseSoft() }
 
-    val miniPlayerShape = RoundedCornerShape(28.dp)
+    val miniPlayerShape = RoundedCornerShape(32.dp)
 
     if (mediaItem != null) BottomSheet(
         state = layoutState,
@@ -210,25 +203,58 @@ fun Player(
                         ) else modifier
                     }
                     .fillMaxWidth()
-                    .height(64.dp)
-                    .padding(horizontal = 14.dp, vertical = 10.dp)
+                    .height(Dimensions.items.collapsedPlayerHeight)
+                    .padding(horizontal = 12.dp, vertical = 8.dp)
                     .clip(miniPlayerShape)
-                    .background(colorPalette.background1)
+                    .background(colorPalette.background1.copy(alpha = 0.82f))
                     .then(innerModifier)
                     .padding(horizontalBottomPaddingValues)
+                    .border(
+                        width = 1.dp,
+                        color = Color.White.copy(alpha = if (colorPalette.isDark) 0.34f else 0.52f),
+                        shape = miniPlayerShape
+                    )
+                    .clickable(
+                        indication = ripple(bounded = true),
+                        interactionSource = remember { MutableInteractionSource() },
+                        onClick = layoutState::expandSoft
+                    )
             ) {
+                AsyncImage(
+                    model = metadata?.artworkUri?.thumbnail(Dimensions.thumbnails.song.px),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = 0.42f
+                            scaleX = 1.18f
+                            scaleY = 1.18f
+                        }
+                        .blur(22.dp)
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            colorPalette.background1.copy(
+                                alpha = if (colorPalette.isDark) 0.38f else 0.66f
+                            )
+                        )
+                )
+
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 12.dp)
+                        .padding(horizontal = 14.dp)
                 ) {
                     // Circular play/pause button with progress ring
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(46.dp)
+                            .size(48.dp)
                             .drawWithContent {
                                 drawContent()
 
@@ -280,20 +306,20 @@ fun Player(
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(36.dp)
+                            .size(40.dp)
                                 .clip(CircleShape)
                                 .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
                                 .background(colorPalette.background0)
                         )
                         Box(
                             modifier = Modifier
-                                .size(36.dp)
+                            .size(40.dp)
                                 .clip(CircleShape)
                                 .background(Color.Black.copy(alpha = if (shouldBePlaying) 0f else 0.35f))
                         )
                         if (!shouldBePlaying) AnimatedPlayPauseButton(
                             playing = shouldBePlaying,
-                            modifier = Modifier.size(16.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
 
@@ -301,7 +327,7 @@ fun Player(
                     Column(
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier
-                            .height(Dimensions.items.collapsedPlayerHeight)
+                            .height(48.dp)
                             .weight(1f)
                     ) {
                         AnimatedContent(
@@ -311,7 +337,7 @@ fun Player(
                         ) { text ->
                             BasicText(
                                 text = text,
-                                style = typography.xs.semiBold,
+                                style = typography.s.semiBold,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis
                             )
@@ -345,24 +371,57 @@ fun Player(
                         }
                     }
 
-                    // Favorite heart
-                    BasicText(
-                        text = if (likedAt != null) "♥" else "♡",
-                        style = typography.xs.semiBold.copy(
-                            fontSize = 22.sp,
-                            color = if (likedAt != null) Color(0xFFE0245E) else colorPalette.text.copy(alpha = 0.55f)
-                        ),
+                    // Open the full player.
+                    Box(
                         modifier = Modifier
+                            .size(40.dp)
                             .clip(CircleShape)
+                            .background(colorPalette.background1.copy(alpha = 0.42f))
+                            .clickable(
+                                indication = ripple(bounded = false),
+                                interactionSource = remember { MutableInteractionSource() },
+                                onClick = layoutState::expandSoft
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(R.drawable.headphones),
+                            contentDescription = stringResource(R.string.auto_open_player),
+                            colorFilter = ColorFilter.tint(colorPalette.text),
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    // Favorite heart.
+                    Box(
+                        modifier = Modifier
+                            .size(40.dp)
+                            .clip(CircleShape)
+                            .border(
+                                width = 1.5.dp,
+                                color = Color.White.copy(alpha = 0.42f),
+                                shape = CircleShape
+                            )
                             .clickable(
                                 indication = ripple(bounded = false),
                                 interactionSource = remember { MutableInteractionSource() },
                                 onClick = {
                                     likedAt = if (likedAt == null) System.currentTimeMillis() else null
                                 }
-                            )
-                            .padding(8.dp)
-                    )
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Image(
+                            painter = painterResource(
+                                if (likedAt == null) R.drawable.heart_outline else R.drawable.heart
+                            ),
+                            contentDescription = stringResource(R.string.favorites),
+                            colorFilter = ColorFilter.tint(
+                                if (likedAt != null) Color(0xFFE0245E) else colorPalette.text
+                            ),
+                            modifier = Modifier.size(24.dp)
+                        )
+                    }
                 }
             }
         }
@@ -470,7 +529,7 @@ fun Player(
                 duration = duration,
                 likedAt = likedAt,
                 setLikedAt = { likedAt = it },
-                isShowingLyrics = isShowingLyrics,
+                                isShowingLyrics = isShowingLyrics,
                 onShowLyrics = { isShowingLyrics = it },
 onOpenQueue = {
     menuState.display {
@@ -534,7 +593,7 @@ onOpenQueue = {
                 )
             }
         }
-
+                
         var boostDialogOpen by rememberSaveable { mutableStateOf(false) }
         if (boostDialogOpen) {
             fun submit(state: Float) = transaction {
@@ -612,7 +671,7 @@ onOpenQueue = {
                             }
                         }
                     },
-                    modifier = Modifier
+                                        modifier = Modifier
                         .padding(vertical = 8.dp)
                         .size(20.dp)
                 )
@@ -653,3 +712,4 @@ private fun onDismiss(binder: PlayerService.Binder) {
     binder.stopRadio()
     binder.player.clearMediaItems()
 }
+
