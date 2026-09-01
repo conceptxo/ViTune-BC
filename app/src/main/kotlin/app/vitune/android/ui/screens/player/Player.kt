@@ -258,7 +258,7 @@ fun Player(
                         .fillMaxSize()
                         .padding(horizontal = 14.dp)
                 ) {
-                    // Circular play/pause button with progress ring
+                    // Circular play/pause button with circular progress indicator
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
@@ -314,14 +314,14 @@ fun Player(
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                            .size(40.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                                 .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
                                 .background(colorPalette.background0)
                         )
                         Box(
                             modifier = Modifier
-                            .size(40.dp)
+                                .size(40.dp)
                                 .clip(CircleShape)
                                 .background(Color.Black.copy(alpha = if (shouldBePlaying) 0f else 0.35f))
                         )
@@ -331,7 +331,7 @@ fun Player(
                         )
                     }
 
-                    // Title / artist
+                    // Title & Artist
                     Column(
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier
@@ -379,7 +379,7 @@ fun Player(
                         }
                     }
 
-                    // Open the full player.
+                    // Audio output icon button
                     Box(
                         modifier = Modifier
                             .size(40.dp)
@@ -400,7 +400,7 @@ fun Player(
                         )
                     }
 
-                    // Favorite heart.
+                    // Favorite button
                     Box(
                         modifier = Modifier
                             .size(40.dp)
@@ -436,6 +436,9 @@ fun Player(
     ) {
         var isShowingStatsForNerds by rememberSaveable { mutableStateOf(false) }
         var isShowingLyricsDialog by rememberSaveable { mutableStateOf(false) }
+        var audioDialogOpen by rememberSaveable { mutableStateOf(false) }
+        var boostDialogOpen by rememberSaveable { mutableStateOf(false) }
+
         if (isShowingLyricsDialog) LyricsDialog(onDismiss = { isShowingLyricsDialog = false })
 
         val playerBottomSheetState = rememberBottomSheetState(
@@ -513,7 +516,7 @@ fun Player(
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
-                               .weight(0.66f)
+                    .weight(0.66f)
                     .padding(bottom = 16.dp)
             ) {
                 thumbnailContent(Modifier.padding(horizontal = 16.dp))
@@ -539,19 +542,19 @@ fun Player(
                 setLikedAt = { likedAt = it },
                 isShowingLyrics = isShowingLyrics,
                 onShowLyrics = { isShowingLyrics = it },
-onOpenQueue = {
-    menuState.display {
-        PlayerMenu(
-            onDismiss = menuState::hide,
-            mediaItem = mediaItem!!,
-            binder = binder!!,
-            onShowSpeedDialog = { audioDialogOpen = true },
-            onShowNormalizationDialog = {
-                boostDialogOpen = true
-            }.takeIf { volumeNormalization }
-        )
-    }
-},
+                onOpenQueue = {
+                    menuState.display {
+                        PlayerMenu(
+                            onDismiss = menuState::hide,
+                            mediaItem = mediaItem!!,
+                            binder = binder!!,
+                            onShowSpeedDialog = { audioDialogOpen = true },
+                            onShowNormalizationDialog = {
+                                boostDialogOpen = true
+                            }.takeIf { volumeNormalization }
+                        )
+                    }
+                },
                 modifier = Modifier
                     .padding(vertical = 8.dp)
                     .fillMaxWidth()
@@ -559,7 +562,6 @@ onOpenQueue = {
             )
         }
 
-        var audioDialogOpen by rememberSaveable { mutableStateOf(false) }
         if (audioDialogOpen) SliderDialog(
             onDismiss = { audioDialogOpen = false },
             title = stringResource(R.string.playback_settings)
@@ -602,7 +604,6 @@ onOpenQueue = {
             }
         }
 
-        var boostDialogOpen by rememberSaveable { mutableStateOf(false) }
         if (boostDialogOpen) {
             fun submit(state: Float) = transaction {
                 mediaItem?.mediaId?.let { mediaId ->
