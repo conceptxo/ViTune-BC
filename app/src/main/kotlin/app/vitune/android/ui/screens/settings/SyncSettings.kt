@@ -24,7 +24,7 @@ fun SyncSettings() {
     }
 
     SettingsCategoryScreen(title = stringResource(R.string.sync)) {
-        SettingsGroup(title = "YouTube Music Account") {
+        SettingsGroup(title = "YouTube Account Sync") {
             SettingsEntry(
                 title = "Log in via Google WebView",
                 text = "Securely log into your YouTube account to sync playlists automatically",
@@ -33,3 +33,4 @@ fun SyncSettings() {
         }
     }
 }
+
