@@ -470,7 +470,7 @@ fun BitChordPlayer(
 
         Row(
             horizontalArrangement = Arrangement.SpaceEvenly,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).padding(bottom = 12.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -478,7 +478,7 @@ fun BitChordPlayer(
                         shuffleOn = !shuffleOn
                         binder.player.shuffleModeEnabled = shuffleOn
                     }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .padding(horizontal = 14.dp)
             ) {
                 BasicText(
                     text = "Shuffle",
@@ -498,7 +498,7 @@ fun BitChordPlayer(
                         }
                         binder.player.repeatMode = repeatMode
                     }
-                    .padding(horizontal = 14.dp, vertical = 8.dp)
+                    .padding(horizontal = 14.dp)
             ) {
                 BasicText(
                     text = if (repeatMode == Player.REPEAT_MODE_ONE) "Repeat 1" else "Repeat",
@@ -523,6 +523,6 @@ IconButton(
 )
         }
 
-        Spacer(modifier = Modifier.height(48.dp))
+        Spacer(modifier = Modifier.height(8.dp))
     }
 }
