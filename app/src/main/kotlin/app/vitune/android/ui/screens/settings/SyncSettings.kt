@@ -47,6 +47,7 @@ import app.vitune.android.utils.center
 import app.vitune.android.utils.get
 import app.vitune.android.utils.rememberPreference
 import app.vitune.android.utils.semiBold
+import app.vitune.android.utils.secondary
 import app.vitune.android.utils.upsert
 import app.vitune.compose.persist.persistList
 import app.vitune.core.ui.LocalAppearance
