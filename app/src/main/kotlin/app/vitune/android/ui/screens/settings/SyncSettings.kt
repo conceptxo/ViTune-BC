@@ -43,6 +43,7 @@ import app.vitune.android.ui.components.themed.DialogTextButton
 import app.vitune.android.ui.components.themed.IconButton
 import app.vitune.android.ui.components.themed.TextField
 import app.vitune.android.ui.screens.Route
+import app.vitune.android.utils.get
 import app.vitune.android.utils.center
 import app.vitune.android.preferences.rememberPreference
 import app.vitune.android.utils.semiBold
@@ -70,7 +71,8 @@ fun SyncSettings(
     val pipedSessions by Database.pipedSessions().collectAsState(initial = listOf())
 
     // YouTube Music Cookie Preference
-    var ytCookie by rememberPreference(key = "yt_account_cookie", defaultValue = "")
+    val preferences = remember { context.getSharedPreferences("preferences", android.content.Context.MODE_PRIVATE) }
+    var ytCookie by rememberSaveable { mutableStateOf(preferences.getString("yt_account_cookie", "") ?: "") }
     var showYtCookieDialog by remember { mutableStateOf(false) }
     var tempCookieText by rememberSaveable { mutableStateOf("") }
 
@@ -102,7 +104,10 @@ fun SyncSettings(
                     text = "Save",
                     primary = true,
                     onClick = {
-                        ytCookie = tempCookieText.trim()
+                        val cleaned = tempCookieText.trim()
+                        ytCookie = cleaned
+                        preferences.edit().putString("yt_account_cookie", cleaned).apply()
+                        app.vitune.providers.innertube.Innertube.cookie = cleaned
                         showYtCookieDialog = false
                     },
                     modifier = Modifier.align(Alignment.CenterHorizontally)
@@ -110,7 +115,7 @@ fun SyncSettings(
             }
         }
     }
-
+    
     var linkingPiped by remember { mutableStateOf(false) }
     if (linkingPiped) DefaultDialog(
         onDismiss = { linkingPiped = false },
