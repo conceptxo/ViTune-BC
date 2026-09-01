@@ -49,6 +49,8 @@ object Innertube {
         }
     }
 
+    var cookie: String? = null
+
     val logger: Logger = LoggerFactory.getLogger(Innertube::class.java)
     val baseClient = HttpClient(OkHttp) {
         expectSuccess = true
@@ -77,12 +79,16 @@ object Innertube {
 
         install(OriginInterceptor)
     }
-    val client = baseClient.config {
+
+    val client get() = baseClient.config {
         defaultRequest {
             url(scheme = "https", host = "music.youtube.com") {
                 contentType(ContentType.Application.Json)
                 headers {
                     set("X-Goog-Api-Key", API_KEY)
+                    cookie?.let {
+                        if (it.isNotBlank()) set("Cookie", it)
+                    }
                 }
                 parameters {
                     set("prettyPrint", "false")
@@ -91,7 +97,7 @@ object Innertube {
             }
         }
     }
-
+    
     private const val API_KEY = "AIzaSyC9XL3ZjWddXya6X74dJoCTL-WEYFDNX30"
 
     private const val BASE = "/youtubei/v1"
