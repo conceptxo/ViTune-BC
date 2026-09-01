@@ -107,16 +107,24 @@ import app.vitune.core.ui.utils.px
 import app.vitune.core.ui.utils.roundedShape
 import app.vitune.core.ui.utils.songBundle
 import app.vitune.providers.innertube.models.NavigationEndpoint
-<vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="24dp"
-    android:height="24dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24">
+import coil3.compose.AsyncImage
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlin.math.absoluteValue
 
-    <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M12,3C7.03,3 3,7.03 3,12v5c0,1.1 0.9,2 2,2h2v-7H5v-0.01C5,8.13 8.13,5 12,5s7,3.13 7,6.99V12h-2v7h2c1.1,0 2,-0.9 2,-2v-5c0,-4.97 -4.03,-9 -9,-9zM7,12h2v7H7v-7zM15,12h2v7h-2v-7z" />
-</vector>
+@Composable
+fun Player(
+    layoutState: BottomSheetState,
+    modifier: Modifier = Modifier,
+    shape: RoundedCornerShape = RoundedCornerShape(
+        topStart = 12.dp,
+        topEnd = 12.dp
+    ),
+    windowInsets: WindowInsets = WindowInsets.systemBars
+) = with(PlayerPreferences) {
+    val menuState = LocalMenuState.current
+    val (colorPalette, typography, thumbnailCornerSize) = LocalAppearance.current
+    val binder = LocalPlayerServiceBinder.current
+    val pipHandler = rememberPipHandler()
 
     PersistMapCleanup(prefix = "queue/suggestions")
 
@@ -160,11 +168,11 @@ import app.vitune.providers.innertube.models.NavigationEndpoint
             }
 
             override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                shouldBePlaying = player.shouldBePlaying
+                shouldBePlaying = binder?.player?.shouldBePlaying == true
             }
 
             override fun onPlaybackStateChanged(playbackState: Int) {
-                shouldBePlaying = player.shouldBePlaying
+                shouldBePlaying = binder?.player?.shouldBePlaying == true
             }
         }
     }
@@ -529,7 +537,7 @@ import app.vitune.providers.innertube.models.NavigationEndpoint
                 duration = duration,
                 likedAt = likedAt,
                 setLikedAt = { likedAt = it },
-                                isShowingLyrics = isShowingLyrics,
+                isShowingLyrics = isShowingLyrics,
                 onShowLyrics = { isShowingLyrics = it },
 onOpenQueue = {
     menuState.display {
@@ -593,7 +601,7 @@ onOpenQueue = {
                 )
             }
         }
-                
+
         var boostDialogOpen by rememberSaveable { mutableStateOf(false) }
         if (boostDialogOpen) {
             fun submit(state: Float) = transaction {
@@ -671,7 +679,7 @@ onOpenQueue = {
                             }
                         }
                     },
-                                        modifier = Modifier
+                    modifier = Modifier
                         .padding(vertical = 8.dp)
                         .size(20.dp)
                 )
@@ -712,4 +720,3 @@ private fun onDismiss(binder: PlayerService.Binder) {
     binder.stopRadio()
     binder.player.clearMediaItems()
 }
-
