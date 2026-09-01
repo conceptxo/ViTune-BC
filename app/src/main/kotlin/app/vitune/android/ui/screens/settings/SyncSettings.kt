@@ -288,14 +288,20 @@ fun SyncSettings(
 
     SettingsCategoryScreen(title = stringResource(R.string.sync)) {
         SettingsDescription(text = stringResource(R.string.sync_description))
-
-           // YouTube Music Group
+        
+        // YouTube Music Group
         SettingsGroup(title = "YouTube Music Account") {
             SettingsEntry(
-                title = if (ytCookie.isNotBlank()) "YouTube Music Cookie (Logged In)" else "Tap to show token / Log in",
-                text = if (ytCookie.isNotBlank()) "Tap to edit or clear your login cookie" else "Paste your inner-tube cookie token to sync playlists",
+                title = "Google Web Login",
+                text = if (ytCookie.isNotBlank()) "Logged in via Web" else "Sign in with your Google account seamlessly",
+                onClick = { showWebLoginDialog = true }
+            )
+            SettingsEntry(
+                title = "Paste Cookie Token",
+                text = if (ytCookie.isNotBlank()) "Cookie token active (Tap to update)" else "Paste your raw cookie string manually",
                 onClick = {
-                    showWebLoginDialog = true
+                    tempCookieText = ytCookie
+                    showYtCookieDialog = true
                 }
             )
         }
@@ -337,4 +343,4 @@ fun SyncSettings(
             }
         }
     }
-}
+    
