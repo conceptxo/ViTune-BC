@@ -33,7 +33,7 @@ fun SyncSettings() {
                         .fillMaxWidth()
                         .verticalScroll(rememberScrollState())
                 ) {
-                    Text("Paste your cookie token below to sync your playlists.")
+                    Text("Paste your cookie text below. Non-cookie lines will be automatically filtered out.")
                     Spacer(modifier = Modifier.height(12.dp))
                     OutlinedTextField(
                         value = tempCookieText,
@@ -46,13 +46,23 @@ fun SyncSettings() {
             confirmButton = {
                 TextButton(
                     onClick = {
+                        // Extract only valid cookie lines containing '=' and strip headers/metadata
                         val cleaned = tempCookieText.lines()
                             .map { it.trim() }
-                            .filter { it.isNotEmpty() && !it.startsWith("***") }
-                            .joinToString("; ")
-                        ytCookie = cleaned
-                        preferences.edit().putString("yt_account_cookie", cleaned).apply()
-                        Innertube.cookie = cleaned
+                            .filter { it.contains("=") && !it.startsWith("***") && !it.startsWith("ETW") }
+                            .joinToString("; {\\n}") { it.substringBefore(";") } // Clean formatting
+                            
+                        // Alternatively, standard semicolon-separated key-values:
+                        val finalCookies = tempCookieText.lines()
+                            .map { it.trim() }
+                            .filter { it.contains("=") && !it.startsWith("***") }
+                            .joinToString("; ") { line ->
+                                if (line.endsWith(";")) line.dropLast(1) else line
+                            }
+
+                        ytCookie = finalCookies
+                        preferences.edit().putString("yt_account_cookie", finalCookies).apply()
+                        Innertube.cookie = finalCookies
                         showYtCookieDialog = false
                     }
                 ) {
@@ -93,7 +103,7 @@ fun SyncSettings() {
                 )
                 Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = if (ytCookie.isNotBlank()) "Cookie token active (Tap to update)" else "Paste your raw cookie string manually",
+                    text = if (ytCookie.isNotBlank()) "Cookie active (Tap to update)" else "Paste your raw cookie string manually",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
