@@ -535,9 +535,11 @@ class MainApplication : Application(), SingletonImageLoader.Factory, Configurati
         )
         Dependencies.init(this)
 
-app.vitune.providers.innertube.Innertube.cookie = 
-    getSharedPreferences("preferences", MODE_PRIVATE).getString("yt_account_cookie", "") ?: ""
-        
+        app.vitune.providers.innertube.Innertube.cookie = 
+            getSharedPreferences("preferences", MODE_PRIVATE).getString("yt_account_cookie", "")
+                .takeIf { !it.isNullOrEmpty() }
+                ?: android.webkit.CookieManager.getInstance().getCookie("https://music.youtube.com")
+                ?: ""
         
         MonetCompat.debugLog = BuildConfig.DEBUG
         super.onCreate()
@@ -578,7 +580,7 @@ object Dependencies {
         if (!Python.isStarted()) Python.start(AndroidPlatform(application))
         Python.getInstance()
     }
-
+    
     private val module by lazy { py.getModule("download") }
 
     val quickjsPath by lazy {
