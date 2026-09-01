@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
@@ -17,14 +18,21 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.vitune.android.R
 import app.vitune.android.ui.components.*
-import app.vitune.android.ui.utils.*
+import app.vitune.android.ui.dialogs.*
+import app.vitune.android.ui.styling.*
+import app.vitune.android.utils.*
 import app.vitune.providers.innertube.Innertube
 import app.vitune.providers.piped.Piped
 import app.vitune.providers.piped.Instance
 import app.vitune.providers.piped.PipedSession
+import app.vitune.data.Database
+import app.vitune.database.transaction
+import app.vitune.compose.persist.persistList
+import app.vitune.compose.persist.rememberPersistList
 import io.ktor.http.Url
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
+import kotlinx.collections.immutable.fastForEachIndexed
 
 @Composable
 fun SyncSettings() {
