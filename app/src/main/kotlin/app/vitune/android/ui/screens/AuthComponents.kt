@@ -6,7 +6,9 @@ import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.Toast
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -85,7 +87,7 @@ fun AuthScreen(
         authViewModel.eventFlow.collectLatest { event ->
             when (event) {
                 AuthViewModel.ScreenEvent.Out.LoginCompleted -> {
-                    Toast.makeText(context, "Login Successful & Cookies Saved!", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, "Login Successful! Cookies saved.", Toast.LENGTH_LONG).show()
                     onBack()
                 }
             }
@@ -117,9 +119,9 @@ fun AuthScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("YouTube Account Login") },
+                title = { Text("Log in to YouTube") },
                 navigationIcon = {
-                    TextButton(onClick = onBack) { Text("Close") }
+                    TextButton(onClick = onBack) { Text("Back") }
                 }
             )
         }
@@ -136,3 +138,4 @@ fun AuthScreen(
         }
     }
 }
+
