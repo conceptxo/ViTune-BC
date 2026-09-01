@@ -28,19 +28,21 @@ fun YouTubePlaylistsScreen(
 
     LaunchedEffect(Unit) {
         playlists = withContext(Dispatchers.IO) {
-            Innertube.likedPlaylists().getOrNull()
+            Innertube.likedPlaylists()?.getOrNull()
         }
     }
 
     Box(modifier = modifier.fillMaxSize()) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             items(playlists.orEmpty()) { playlist ->
+                val info = playlist.info
+                val endpoint = info?.endpoint
                 ListItem(
-                    headlineContent = { Text(playlist.info?.name.orEmpty()) },
+                    headlineContent = { Text(info?.name.orEmpty()) },
                     supportingContent = { Text("${playlist.songCount ?: 0} songs") },
                     modifier = Modifier.clickable {
-                        playlist.info?.endpoint?.browseId?.let { browseId ->
-                            onPlaylistClick(browseId, playlist.info.endpoint?.params)
+                        endpoint?.browseId?.let { browseId ->
+                            onPlaylistClick(browseId, endpoint.params)
                         }
                     }
                 )
