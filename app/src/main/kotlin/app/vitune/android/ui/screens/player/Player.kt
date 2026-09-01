@@ -127,7 +127,6 @@ fun Player(
     val pipHandler = rememberPipHandler()
 
     PersistMapCleanup(prefix = "queue/suggestions")
-
     var mediaItem by remember(binder) {
         mutableStateOf(
             value = binder?.player?.currentMediaItem,
@@ -136,15 +135,19 @@ fun Player(
     }
     var shouldBePlaying by remember(binder) { mutableStateOf(binder?.player?.shouldBePlaying == true) }
 
+    LaunchedEffect(mediaItem) {
+        if (mediaItem != null && layoutState.dismissed) {
+            layoutState.collapseSoft()
+        }
+    }
+
     var likedAt by remember(mediaItem) {
         mutableStateOf(
             value = null,
             policy = object : SnapshotMutationPolicy<Long?> {
                 override fun equivalent(a: Long?, b: Long?): Boolean {
                     mediaItem?.mediaId?.let {
-                        query {
-                            Database.like(it, b)
-                        }
+                        query { Database.like(it, b) }
                     }
                     return a == b
                 }
@@ -154,12 +157,15 @@ fun Player(
 
     LaunchedEffect(mediaItem) {
         mediaItem?.mediaId?.let { mediaId ->
-            Database
-                .likedAt(mediaId)
-                .distinctUntilChanged()
-                .collect { likedAt = it }
+            kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                Database
+                    .likedAt(mediaId)
+                    .distinctUntilChanged()
+                    .collect { likedAt = it }
+            }
         }
     }
+    
 
     binder?.player.DisposableListener {
         object : Player.Listener {
