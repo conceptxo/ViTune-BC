@@ -1,6 +1,7 @@
 package app.vitune.android.ui.screens.settings
 
 import android.Manifest
+import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.os.Build
@@ -40,6 +41,7 @@ import app.vitune.android.service.ServiceNotifications
 import app.vitune.android.ui.components.themed.CircularProgressIndicator
 import app.vitune.android.ui.components.themed.DefaultDialog
 import app.vitune.android.ui.components.themed.SecondaryTextButton
+import app.vitune.android.ui.screens.AuthScreen
 import app.vitune.android.ui.screens.Route
 import app.vitune.android.utils.bold
 import app.vitune.android.utils.center
@@ -92,11 +94,8 @@ class VersionCheckWorker(
                 .build()
 
             workManager.enqueueUniquePeriodicWork(
-                /* uniqueWorkName = */
                 WORK_TAG,
-                /* existingPeriodicWorkPolicy = */
                 ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
-                /* periodicWork = */
                 request
             )
 
@@ -138,7 +137,7 @@ class VersionCheckWorker(
         return when {
             result == null || result.isFailure -> Result.retry()
             result.isSuccess -> Result.success()
-            else -> Result.failure() // Unreachable
+            else -> Result.failure()
         }
     }
 }
@@ -191,6 +190,24 @@ fun About() = SettingsCategoryScreen(
         onResult = { hasPermission = it }
     )
 
+    var showWebViewLogin by remember { mutableStateOf(false) }
+
+    if (showWebViewLogin) {
+        AuthScreen(
+            onBack = { showWebViewLogin = false },
+            application = context.applicationContext as Application
+        )
+        return@SettingsCategoryScreen
+    }
+
+    SettingsGroup(title = "Account Sync") {
+        SettingsEntry(
+            title = "Log in via Google WebView",
+            text = "Log in to YouTube to sync playlists automatically",
+            onClick = { showWebViewLogin = true }
+        )
+    }
+
     SettingsGroup(title = stringResource(R.string.social)) {
         SettingsEntry(
             title = stringResource(R.string.github),
@@ -207,7 +224,6 @@ fun About() = SettingsCategoryScreen(
             text = stringResource(R.string.report_bug_description),
             onClick = {
                 uriHandler.openUri(
-                    @Suppress("MaximumLineLength")
                     "https://github.com/$REPO_OWNER/$REPO_NAME/issues/new?assignees=&labels=bug&template=bug_report.yaml"
                 )
             }
@@ -218,7 +234,6 @@ fun About() = SettingsCategoryScreen(
             text = stringResource(R.string.redirect_github),
             onClick = {
                 uriHandler.openUri(
-                    @Suppress("MaximumLineLength")
                     "https://github.com/$REPO_OWNER/$REPO_NAME/issues/new?assignees=&labels=enhancement&template=feature_request.md"
                 )
             }
@@ -299,3 +314,4 @@ fun About() = SettingsCategoryScreen(
         }
     }
 }
+
