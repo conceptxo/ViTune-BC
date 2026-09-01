@@ -21,7 +21,7 @@ fun LoginDialog(
 ) {
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformProperties = false)
+        properties = DialogProperties()
     ) {
         AndroidView(
             modifier = Modifier.fillMaxSize().padding(16.dp),
@@ -46,3 +46,4 @@ fun LoginDialog(
         )
     }
 }
+
