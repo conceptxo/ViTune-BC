@@ -1,6 +1,5 @@
 package app.vitune.android.ui.screens
 
-import android.annotation.SuppressLint
 import android.app.Application
 import android.view.ViewGroup
 import android.webkit.CookieManager
@@ -20,7 +19,6 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
-import androidx.lifecycle.viewmodel.compose.viewModel
 import app.vitune.providers.innertube.Innertube
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -80,10 +78,10 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
 @Composable
 fun AuthScreen(
     onBack: () -> Unit,
-    application: Application,
-    authViewModel: AuthViewModel = viewModel(factory = AuthViewModel.Factory(application))
+    application: Application
 ) {
     val context = LocalContext.current
+    val authViewModel = remember { AuthViewModel(application) }
 
     LaunchedEffect(Unit) {
         authViewModel.eventFlow.collectLatest { event ->
