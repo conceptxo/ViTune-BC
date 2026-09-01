@@ -535,9 +535,9 @@ class MainApplication : Application(), SingletonImageLoader.Factory, Configurati
         )
         Dependencies.init(this)
 
-        app.vitune.providers.innertube.Innertube.cookie = 
-            GlobalPreferencesHolder().get("yt_account_cookie", "")
-
+app.vitune.providers.innertube.Innertube.cookie = 
+    GlobalPreferencesHolder().preferences.getString("yt_account_cookie", "") ?: ""
+        
         MonetCompat.debugLog = BuildConfig.DEBUG
         super.onCreate()
 
