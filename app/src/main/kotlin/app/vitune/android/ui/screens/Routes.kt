@@ -15,6 +15,7 @@ import app.vitune.android.ui.screens.album.AlbumScreen
 import app.vitune.android.ui.screens.artist.ArtistScreen
 import app.vitune.android.ui.screens.pipedplaylist.PipedPlaylistScreen
 import app.vitune.android.ui.screens.playlist.PlaylistScreen
+import app.vitune.android.ui.screens.playlist.YouTubePlaylistsScreen
 import app.vitune.android.ui.screens.search.SearchScreen
 import app.vitune.android.ui.screens.searchresult.SearchResultScreen
 import app.vitune.android.ui.screens.settings.LogsScreen
@@ -48,6 +49,7 @@ val moodRoute = Route1<Mood>("moodRoute")
 val searchResultRoute = Route1<String>("searchResultRoute")
 val searchRoute = Route1<String>("searchRoute")
 val settingsRoute = Route0("settingsRoute")
+val youtubePlaylistsRoute = Route0("youtubePlaylistsRoute")
 
 @Composable
 fun RouteHandlerScope.GlobalRoutes() {
@@ -83,6 +85,14 @@ fun RouteHandlerScope.GlobalRoutes() {
             params = params,
             maxDepth = maxDepth,
             shouldDedup = shouldDedup
+        )
+    }
+
+    youtubePlaylistsRoute {
+        YouTubePlaylistsScreen(
+            onPlaylistClick = { browseId, params ->
+                playlistRoute(browseId, params, null, false)
+            }
         )
     }
 
