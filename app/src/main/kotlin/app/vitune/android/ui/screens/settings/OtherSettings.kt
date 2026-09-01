@@ -117,7 +117,7 @@ fun OtherSettings() {
             SettingsEntry(
                 title = "My Playlists",
                 text = "View your remote account playlists",
-                onClick = { youtubePlaylistsRoute() }
+                onClick = { youtubePlaylistsRoute.global() }
             )
         }
         SettingsGroup(title = stringResource(R.string.android_auto)) {
@@ -346,7 +346,6 @@ fun OtherSettings() {
                     },
                     enabled = !reloading,
                     modifier = Modifier
-                        -> Modifier
                         .fillMaxWidth()
                         .padding(start = 16.dp)
                         .padding(horizontal = 16.dp)
@@ -382,3 +381,4 @@ fun OtherSettings() {
         }
     }
 }
+
