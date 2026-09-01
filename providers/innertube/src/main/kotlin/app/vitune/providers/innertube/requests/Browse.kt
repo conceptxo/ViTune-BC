@@ -107,3 +107,22 @@ fun MusicNavigationButtonRenderer.toItem() = when {
     isMood -> toMood()
     else -> null
 }
+suspend fun Innertube.likedPlaylists() = runCatchingCancellable {
+    val response = client.post(BROWSE) {
+        setBody(BrowseBody(browseId = "FEmusic_liked_playlists"))
+    }.body<BrowseResponse>()
+
+    response.contents
+        ?.singleColumnBrowseResultsRenderer
+        ?.tabs
+        ?.firstOrNull()
+        ?.tabRenderer
+        ?.content
+        ?.sectionListRenderer
+        ?.contents
+        ?.firstOrNull()
+        ?.gridRenderer
+        ?.items
+        ?.mapNotNull { it.musicTwoRowItemRenderer?.toItem() as? Innertube.PlaylistItem }
+        .orEmpty()
+}
