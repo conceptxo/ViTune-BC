@@ -45,6 +45,7 @@ import app.vitune.android.ui.components.themed.TextField
 import app.vitune.android.ui.screens.Route
 import app.vitune.android.utils.center
 import app.vitune.android.utils.get
+import app.vitune.android.utils.rememberPreference
 import app.vitune.android.utils.semiBold
 import app.vitune.android.utils.upsert
 import app.vitune.compose.persist.persistList
@@ -67,6 +68,48 @@ fun SyncSettings(
     val context = LocalContext.current
 
     val pipedSessions by Database.pipedSessions().collectAsState(initial = listOf())
+
+    // YouTube Music Cookie Preference
+    var ytCookie by rememberPreference(key = "yt_account_cookie", defaultValue = "")
+    var showYtCookieDialog by remember { mutableStateOf(false) }
+    var tempCookieText by rememberSaveable { mutableStateOf("") }
+
+    // YouTube Music Cookie Input Modal
+    if (showYtCookieDialog) {
+        DefaultDialog(
+            onDismiss = { showYtCookieDialog = false },
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
+                BasicText(
+                    text = "YouTube Music Cookie",
+                    style = typography.m.semiBold
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                BasicText(
+                    text = "Paste your inner-tube/YouTube account cookie below to sync your personal playlists.",
+                    style = typography.xxs.secondary
+                )
+                Spacer(modifier = Modifier.height(12.dp))
+                TextField(
+                    value = tempCookieText,
+                    onValueChange = { tempCookieText = it },
+                    hintText = "Paste cookie here...",
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                DialogTextButton(
+                    text = "Save",
+                    primary = true,
+                    onClick = {
+                        ytCookie = tempCookieText.trim()
+                        showYtCookieDialog = false
+                    },
+                    modifier = Modifier.align(Alignment.CenterHorizontally)
+                )
+            }
+        }
+    }
 
     var linkingPiped by remember { mutableStateOf(false) }
     if (linkingPiped) DefaultDialog(
@@ -198,7 +241,6 @@ fun SyncSettings(
                         enabled = (customInstance?.isNotBlank() == true || selectedInstance != null) &&
                             username.isNotBlank() && password.isNotBlank(),
                         onClick = {
-                            @Suppress("Wrapping") // thank you ktlint
                             (customInstance?.let {
                                 runCatching {
                                     Url(it)
@@ -265,6 +307,18 @@ fun SyncSettings(
 
     SettingsCategoryScreen(title = stringResource(R.string.sync)) {
         SettingsDescription(text = stringResource(R.string.sync_description))
+
+        // YouTube Music Group
+        SettingsGroup(title = "YouTube Music Account") {
+            SettingsEntry(
+                title = if (ytCookie.isNotBlank()) "YouTube Music Cookie (Logged In)" else "Tap to show token / Log in",
+                text = if (ytCookie.isNotBlank()) "Tap to edit or clear your login cookie" else "Paste your inner-tube cookie token to sync playlists",
+                onClick = {
+                    tempCookieText = ytCookie
+                    showYtCookieDialog = true
+                }
+            )
+        }
 
         SettingsGroup(title = stringResource(R.string.piped)) {
             SettingsEntry(
