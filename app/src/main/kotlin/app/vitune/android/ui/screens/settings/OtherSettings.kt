@@ -49,6 +49,7 @@ import app.vitune.android.ui.components.themed.SliderDialog
 import app.vitune.android.ui.components.themed.SliderDialogBody
 import app.vitune.android.ui.screens.Route
 import app.vitune.android.ui.screens.logsRoute
+import app.vitune.android.ui.screens.youtubePlaylistsRoute
 import app.vitune.android.utils.findActivity
 import app.vitune.android.utils.intent
 import app.vitune.android.utils.isIgnoringBatteryOptimizations
@@ -112,6 +113,13 @@ fun OtherSettings() {
         title = stringResource(R.string.other),
         scrollState = scrollState
     ) {
+        SettingsGroup(title = "YouTube Music") {
+            SettingsEntry(
+                title = "My Playlists",
+                text = "View your remote account playlists",
+                onClick = { youtubePlaylistsRoute() }
+            )
+        }
         SettingsGroup(title = stringResource(R.string.android_auto)) {
             SwitchSettingsEntry(
                 title = stringResource(R.string.android_auto),
@@ -338,6 +346,7 @@ fun OtherSettings() {
                     },
                     enabled = !reloading,
                     modifier = Modifier
+                        -> Modifier
                         .fillMaxWidth()
                         .padding(start = 16.dp)
                         .padding(horizontal = 16.dp)
