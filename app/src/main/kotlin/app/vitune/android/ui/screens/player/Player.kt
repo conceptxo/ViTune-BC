@@ -200,6 +200,8 @@ fun Player(
         collapsedContent = { innerModifier ->
             Box(
                 modifier = Modifier
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                    .then(innerModifier)
                     .let { modifier ->
                         if (horizontalSwipeToClose) modifier.onSwipe(
                             animateOffset = true,
@@ -211,15 +213,12 @@ fun Player(
                         ) else modifier
                     }
                     .fillMaxWidth()
-                    .height(Dimensions.items.collapsedPlayerHeight)
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
+                    .height(64.dp)
                     .clip(miniPlayerShape)
-                    .background(colorPalette.background1.copy(alpha = 0.82f))
-                    .then(innerModifier)
-                    .padding(horizontalBottomPaddingValues)
+                    .background(colorPalette.background1)
                     .border(
                         width = 1.dp,
-                        color = Color.White.copy(alpha = if (colorPalette.isDark) 0.34f else 0.52f),
+                        color = Color.White.copy(alpha = if (colorPalette.isDark) 0.20f else 0.40f),
                         shape = miniPlayerShape
                     )
                     .clickable(
@@ -235,20 +234,11 @@ fun Player(
                     modifier = Modifier
                         .fillMaxSize()
                         .graphicsLayer {
-                            alpha = 0.42f
-                            scaleX = 1.18f
-                            scaleY = 1.18f
+                            alpha = 0.35f
+                            scaleX = 1.15f
+                            scaleY = 1.15f
                         }
-                        .blur(22.dp)
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            colorPalette.background1.copy(
-                                alpha = if (colorPalette.isDark) 0.38f else 0.66f
-                            )
-                        )
+                        .blur(20.dp)
                 )
 
                 Row(
@@ -256,12 +246,12 @@ fun Player(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(horizontal = 14.dp)
+                        .padding(horizontal = 10.dp)
                 ) {
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
-                            .size(48.dp)
+                            .size(44.dp)
                             .drawWithContent {
                                 drawContent()
 
@@ -269,7 +259,7 @@ fun Player(
                                     (position.toFloat() / duration.absoluteValue).coerceIn(0f, 1f)
                                 }.getOrElse { 0f }
 
-                                val stroke = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round)
+                                val stroke = Stroke(width = 2.dp.toPx(), cap = StrokeCap.Round)
                                 val diameter = size.minDimension
                                 val topLeft = Offset(
                                     x = (size.width - diameter) / 2f,
@@ -313,27 +303,26 @@ fun Player(
                             contentDescription = null,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
-                                .border(1.dp, Color.White.copy(alpha = 0.12f), CircleShape)
                                 .background(colorPalette.background0)
                         )
                         Box(
                             modifier = Modifier
-                                .size(40.dp)
+                                .size(36.dp)
                                 .clip(CircleShape)
                                 .background(Color.Black.copy(alpha = if (shouldBePlaying) 0f else 0.35f))
                         )
                         if (!shouldBePlaying) AnimatedPlayPauseButton(
                             playing = shouldBePlaying,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
 
                     Column(
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier
-                            .height(48.dp)
+                            .height(44.dp)
                             .weight(1f)
                     ) {
                         AnimatedContent(
@@ -369,7 +358,7 @@ fun Player(
                                             painter = painterResource(R.drawable.explicit),
                                             contentDescription = null,
                                             colorFilter = ColorFilter.tint(colorPalette.text),
-                                            modifier = Modifier.size(15.dp)
+                                            modifier = Modifier.size(14.dp)
                                         )
                                     }
                                 }
@@ -379,7 +368,7 @@ fun Player(
 
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
                             .background(colorPalette.background1.copy(alpha = 0.42f))
                             .clickable(
@@ -393,19 +382,14 @@ fun Player(
                             painter = painterResource(R.drawable.headphones),
                             contentDescription = stringResource(R.string.auto_open_player),
                             colorFilter = ColorFilter.tint(colorPalette.text),
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(18.dp)
                         )
                     }
 
                     Box(
                         modifier = Modifier
-                            .size(40.dp)
+                            .size(36.dp)
                             .clip(CircleShape)
-                            .border(
-                                width = 1.5.dp,
-                                color = Color.White.copy(alpha = 0.42f),
-                                shape = CircleShape
-                            )
                             .clickable(
                                 indication = ripple(bounded = false),
                                 interactionSource = remember { MutableInteractionSource() },
@@ -423,7 +407,7 @@ fun Player(
                             colorFilter = ColorFilter.tint(
                                 if (likedAt != null) Color(0xFFE0245E) else colorPalette.text
                             ),
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
@@ -438,7 +422,7 @@ fun Player(
         if (isShowingLyricsDialog) LyricsDialog(onDismiss = { isShowingLyricsDialog = false })
 
         val playerBottomSheetState = rememberBottomSheetState(
-            dismissedBound = 64.dp + horizontalBottomPaddingValues.calculateBottomPadding(),
+            dismissedBound = 72.dp + horizontalBottomPaddingValues.calculateBottomPadding(),
             expandedBound = layoutState.expandedBound
         )
 
