@@ -1,5 +1,6 @@
 package app.vitune.android.ui.screens.settings
 
+import app.vitune.android.ui.components.LoginDialog
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -74,45 +75,19 @@ fun SyncSettings(
     var ytCookie by rememberSaveable { mutableStateOf(preferences.getString("yt_account_cookie", "") ?: "") }
     var showYtCookieDialog by remember { mutableStateOf(false) }
     var tempCookieText by rememberSaveable { mutableStateOf("") }
+    var showWebLoginDialog by remember { mutableStateOf(false) }
+        
 
     // YouTube Music Cookie Input Modal
-    if (showYtCookieDialog) {
-        DefaultDialog(
-            onDismiss = { showYtCookieDialog = false },
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
-                BasicText(
-                    text = "YouTube Music Cookie",
-                    style = typography.m.semiBold
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                BasicText(
-                    text = "Paste your inner-tube/YouTube account cookie below to sync your personal playlists.",
-                    style = typography.xxs.secondary
-                )
-                Spacer(modifier = Modifier.height(12.dp))
-                TextField(
-                    value = tempCookieText,
-                    onValueChange = { tempCookieText = it },
-                    hintText = "Paste cookie here...",
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-                DialogTextButton(
-                    text = "Save",
-                    primary = true,
-                    onClick = {
-                        val cleaned = tempCookieText.trim()
-                        ytCookie = cleaned
-                        preferences.edit().putString("yt_account_cookie", cleaned).apply()
-                        app.vitune.providers.innertube.Innertube.cookie = cleaned
-                        showYtCookieDialog = false
-                    },
-                    modifier = Modifier.align(Alignment.CenterHorizontally)
-                )
+    if (showWebLoginDialog) {
+        LoginDialog(
+            onDismiss = { showWebLoginDialog = false },
+            onLoginSuccess = { cookies ->
+                preferences.edit().putString("yt_account_cookie", cookies).apply()
+                app.vitune.providers.innertube.Innertube.cookie = cookies
+                ytCookie = cookies
             }
-        }
+        )
     }
     
     var linkingPiped by remember { mutableStateOf(false) }
@@ -314,14 +289,13 @@ fun SyncSettings(
     SettingsCategoryScreen(title = stringResource(R.string.sync)) {
         SettingsDescription(text = stringResource(R.string.sync_description))
 
-        // YouTube Music Group
+           // YouTube Music Group
         SettingsGroup(title = "YouTube Music Account") {
             SettingsEntry(
                 title = if (ytCookie.isNotBlank()) "YouTube Music Cookie (Logged In)" else "Tap to show token / Log in",
                 text = if (ytCookie.isNotBlank()) "Tap to edit or clear your login cookie" else "Paste your inner-tube cookie token to sync playlists",
                 onClick = {
-                    tempCookieText = ytCookie
-                    showYtCookieDialog = true
+                    showWebLoginDialog = true
                 }
             )
         }
