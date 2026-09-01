@@ -258,7 +258,6 @@ fun Player(
                         .fillMaxSize()
                         .padding(horizontal = 14.dp)
                 ) {
-                    // Circular play/pause button with circular progress indicator
                     Box(
                         contentAlignment = Alignment.Center,
                         modifier = Modifier
@@ -331,7 +330,6 @@ fun Player(
                         )
                     }
 
-                    // Title & Artist
                     Column(
                         verticalArrangement = Arrangement.Center,
                         modifier = Modifier
@@ -379,7 +377,6 @@ fun Player(
                         }
                     }
 
-                    // Audio output icon button
                     Box(
                         modifier = Modifier
                             .size(40.dp)
@@ -400,7 +397,6 @@ fun Player(
                         )
                     }
 
-                    // Favorite button
                     Box(
                         modifier = Modifier
                             .size(40.dp)
