@@ -470,7 +470,8 @@ fun BitChordPlayer(
 
         Row(
             horizontalArrangement = Arrangement.SpaceEvenly,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp).padding(bottom = 12.dp)
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
         ) {
             Box(
                 modifier = Modifier
@@ -478,11 +479,11 @@ fun BitChordPlayer(
                         shuffleOn = !shuffleOn
                         binder.player.shuffleModeEnabled = shuffleOn
                     }
-                    .padding(horizontal = 14.dp)
+                    .padding(horizontal = 8.dp)
             ) {
                 BasicText(
                     text = "Shuffle",
-                                    style = typography.xxs.semiBold.let {
+                    style = typography.xs.semiBold.let {
                         if (shuffleOn) it.copy(color = colorPalette.accent) else it.secondary
                     }
                 )
@@ -498,11 +499,11 @@ fun BitChordPlayer(
                         }
                         binder.player.repeatMode = repeatMode
                     }
-                    .padding(horizontal = 14.dp)
+                    .padding(horizontal = 8.dp)
             ) {
                 BasicText(
                     text = if (repeatMode == Player.REPEAT_MODE_ONE) "Repeat 1" else "Repeat",
-                    style = typography.xxs.semiBold.let {
+                    style = typography.xs.semiBold.let {
                         if (repeatMode != Player.REPEAT_MODE_OFF) it.copy(color = colorPalette.accent) else it.secondary
                     }
                 )
@@ -512,15 +513,15 @@ fun BitChordPlayer(
                 icon = R.drawable.infinite,
                 enabled = PlayerPreferences.trackLoopEnabled,
                 onClick = { PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled },
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(28.dp)
             )
 
-IconButton(
-    icon = R.drawable.ellipsis_horizontal,
-    color = colorPalette.text,
-    onClick = onOpenQueue,
-    modifier = Modifier.size(20.dp)
-)
+            IconButton(
+                icon = R.drawable.ellipsis_horizontal,
+                color = colorPalette.text,
+                onClick = onOpenQueue,
+                modifier = Modifier.size(28.dp)
+            )
         }
 
         Spacer(modifier = Modifier.height(8.dp))
