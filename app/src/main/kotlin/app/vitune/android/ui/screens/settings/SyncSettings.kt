@@ -18,21 +18,23 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import app.vitune.android.R
 import app.vitune.android.ui.components.*
-import app.vitune.android.ui.screens.settings.dialogs.*
-import app.vitune.android.ui.theme.*
+import app.vitune.android.ui.screens.settings.dialogs.LoginDialog
+import app.vitune.android.ui.theme.colorPalette
+import app.vitune.android.ui.theme.typography
 import app.vitune.android.utils.*
 import app.vitune.providers.innertube.Innertube
 import app.vitune.providers.piped.Piped
 import app.vitune.providers.piped.models.Instance
 import app.vitune.providers.piped.models.PipedSession
-import app.vitune.data.Database
-import app.vitune.data.transaction
+import app.vitune.database.Database
+import app.vitune.database.transaction
 import app.vitune.compose.persist.persistList
 import app.vitune.compose.persist.rememberPersistList
 import io.ktor.http.Url
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.launch
 import kotlinx.collections.immutable.fastForEachIndexed
+
 
 @Composable
 fun SyncSettings() {
