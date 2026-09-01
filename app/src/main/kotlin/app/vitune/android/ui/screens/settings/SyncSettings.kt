@@ -1,5 +1,6 @@
 package app.vitune.android.ui.screens.settings
 
+import android.app.Application
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -42,6 +43,7 @@ import app.vitune.android.ui.components.themed.DefaultDialog
 import app.vitune.android.ui.components.themed.DialogTextButton
 import app.vitune.android.ui.components.themed.IconButton
 import app.vitune.android.ui.components.themed.TextField
+import app.vitune.android.ui.screens.AuthScreen
 import app.vitune.android.ui.screens.Route
 import app.vitune.android.utils.center
 import app.vitune.android.utils.get
@@ -65,8 +67,18 @@ fun SyncSettings(
     val (colorPalette, typography) = LocalAppearance.current
     val uriHandler = LocalUriHandler.current
     val context = LocalContext.current
+    val applicationContext = context.applicationContext as Application
 
     val pipedSessions by Database.pipedSessions().collectAsState(initial = listOf())
+
+    var showWebViewLogin by remember { mutableStateOf(false) }
+    if (showWebViewLogin) {
+        AuthScreen(
+            onBack = { showWebViewLogin = false },
+            application = applicationContext
+        )
+        return
+    }
 
     var linkingPiped by remember { mutableStateOf(false) }
     if (linkingPiped) DefaultDialog(
@@ -198,7 +210,7 @@ fun SyncSettings(
                         enabled = (customInstance?.isNotBlank() == true || selectedInstance != null) &&
                             username.isNotBlank() && password.isNotBlank(),
                         onClick = {
-                            @Suppress("Wrapping") // thank you ktlint
+                            @Suppress("Wrapping")
                             (customInstance?.let {
                                 runCatching {
                                     Url(it)
@@ -265,6 +277,14 @@ fun SyncSettings(
 
     SettingsCategoryScreen(title = stringResource(R.string.sync)) {
         SettingsDescription(text = stringResource(R.string.sync_description))
+
+        SettingsGroup(title = "YouTube Account") {
+            SettingsEntry(
+                title = "Log in via Google WebView",
+                text = "Sign in to sync your YouTube playlists and liked songs",
+                onClick = { showWebViewLogin = true }
+            )
+        }
 
         SettingsGroup(title = stringResource(R.string.piped)) {
             SettingsEntry(
