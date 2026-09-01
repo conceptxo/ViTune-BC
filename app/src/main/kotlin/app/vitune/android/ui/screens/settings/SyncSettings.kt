@@ -165,9 +165,10 @@ fun SyncSettings(
 
                         backgroundLoading = true
                         runCatching {
-                            credentialManager.get(context)?.let {
-                                username = it.id
-                                password = it.password
+                            val credential = credentialManager.get(context)
+                            if (credential != null) {
+                                username = credential.id
+                                password = credential.password
                             }
                         }.getOrNull()
                         backgroundLoading = false
@@ -214,6 +215,7 @@ fun SyncSettings(
                         )
                     }
                     Spacer(modifier = Modifier.height(8.dp))
+                    
                     TextField(
                         value = username,
                         onValueChange = { username = it },
