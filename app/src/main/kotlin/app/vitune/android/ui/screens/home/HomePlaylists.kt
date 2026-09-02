@@ -37,6 +37,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
@@ -360,12 +361,21 @@ fun FluidInterlockingPlaylistPill(
         )
     }
 
+    // Dynamic gradient background that ensures visibility on Normal, AMOLED, and Pure Black modes
+    val gradientBrush = Brush.linearGradient(
+        colors = listOf(
+            colorPalette.background1.copy(alpha = 0.95f),
+            colorPalette.accent.copy(alpha = 0.15f),
+            colorPalette.background2.copy(alpha = 0.8f)
+        )
+    )
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
             .clip(shape)
-            .background(colorPalette.background1)
+            .background(brush = gradientBrush)
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -385,3 +395,4 @@ fun FluidInterlockingPlaylistPill(
         )
     }
 }
+
