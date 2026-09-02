@@ -1,15 +1,11 @@
 package app.vitune.android.ui.screens.player
 
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateDp
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.core.updateTransition
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -366,29 +362,6 @@ private fun PlayButton(
 }
 
 @Composable
-private fun AnimatedPlayPauseButton(
-    playing: Boolean,
-    modifier: Modifier = Modifier
-) {
-    val (colorPalette) = LocalAppearance.current
-
-    AnimatedContent(
-        targetState = playing,
-        transitionSpec = {
-            fadeIn(tween(100)) togetherWith fadeOut(tween(100))
-        },
-        label = "playPauseAnimation",
-        modifier = modifier
-    ) { isPlaying ->
-        Image(
-            painter = painterResource(if (isPlaying) R.drawable.pause else R.drawable.play),
-            contentDescription = null,
-            colorFilter = ColorFilter.tint(colorPalette.text)
-        )
-    }
-}
-
-@Composable
 private fun MediaInfo(media: UiMedia) {
     val (colorPalette) = LocalAppearance.current
     var textWidth by remember { mutableIntStateOf(0) }
@@ -405,7 +378,7 @@ private fun MediaInfo(media: UiMedia) {
         ) {
             BasicText(
                 text = media.title,
-                style = MaterialTheme.typography.titleMedium.bold().copy(color = colorPalette.text),
+                style = MaterialTheme.typography.titleMedium.bold.copy(color = colorPalette.text),
                 maxLines = 1,
                 modifier = Modifier
                     .onGloballyPositioned { textWidth = it.size.width }
@@ -426,7 +399,7 @@ private fun MediaInfo(media: UiMedia) {
         ) {
             BasicText(
                 text = media.artists.joinToString(", ") { it.name },
-                style = MaterialTheme.typography.bodyMedium.secondary().copy(color = colorPalette.textSecondary),
+                style = MaterialTheme.typography.bodyMedium.secondary.copy(color = colorPalette.textSecondary),
                 maxLines = 1
             )
         }
