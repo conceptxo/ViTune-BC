@@ -1,33 +1,47 @@
 package app.vitune.android.ui.screens.home
 
+import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.vitune.android.Database
 import app.vitune.android.LocalPlayerAwareWindowInsets
@@ -50,6 +64,7 @@ import app.vitune.android.ui.screens.Route
 import app.vitune.android.ui.screens.builtinplaylist.BuiltInPlaylistScreen
 import app.vitune.android.ui.screens.settings.SettingsEntryGroupText
 import app.vitune.android.ui.screens.settings.SettingsGroupSpacer
+import app.vitune.android.utils.semiBold
 import app.vitune.compose.persist.persist
 import app.vitune.compose.persist.persistList
 import app.vitune.core.data.enums.BuiltInPlaylist
@@ -177,64 +192,46 @@ fun HomePlaylists(
                 }
             }
 
-            // TODO: clean up (also in BuiltInPlaylistScreen): icon etc. could live in BuiltInPlaylist (cleans up duplicate code mess)
-
-            if (BuiltInPlaylist.Favorites in builtInPlaylists) item(key = "favorites") {
-                PlaylistItem(
+            if (BuiltInPlaylist.Favorites in builtInPlaylists) item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) {
+                BuiltInPlaylistPill(
                     icon = R.drawable.heart,
                     colorTint = colorPalette.red,
                     name = stringResource(R.string.favorites),
-                    songCount = null,
-                    thumbnailSize = Dimensions.thumbnails.playlist,
-                    alternative = UIStatePreferences.playlistsAsGrid,
-                    modifier = Modifier
-                        .animateItem()
-                        .clickable { onBuiltInPlaylist(BuiltInPlaylist.Favorites) }
+                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.Favorites) },
+                    modifier = Modifier.animateItem()
                 )
             }
 
-            if (BuiltInPlaylist.Offline in builtInPlaylists) item(key = "offline") {
-                PlaylistItem(
+            if (BuiltInPlaylist.Offline in builtInPlaylists) item(key = "offline", span = { GridItemSpan(maxLineSpan) }) {
+                BuiltInPlaylistPill(
                     icon = R.drawable.airplane,
                     colorTint = colorPalette.blue,
                     name = stringResource(R.string.offline),
-                    songCount = null,
-                    thumbnailSize = Dimensions.thumbnails.playlist,
-                    alternative = UIStatePreferences.playlistsAsGrid,
-                    modifier = Modifier
-                        .animateItem()
-                        .clickable { onBuiltInPlaylist(BuiltInPlaylist.Offline) }
+                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.Offline) },
+                    modifier = Modifier.animateItem()
                 )
             }
 
-            if (BuiltInPlaylist.Top in builtInPlaylists) item(key = "top") {
-                PlaylistItem(
+            if (BuiltInPlaylist.Top in builtInPlaylists) item(key = "top", span = { GridItemSpan(maxLineSpan) }) {
+                BuiltInPlaylistPill(
                     icon = R.drawable.trending,
                     colorTint = colorPalette.red,
                     name = stringResource(
                         R.string.format_my_top_playlist,
                         DataPreferences.topListLength
                     ),
-                    songCount = null,
-                    thumbnailSize = Dimensions.thumbnails.playlist,
-                    alternative = UIStatePreferences.playlistsAsGrid,
-                    modifier = Modifier
-                        .animateItem()
-                        .clickable { onBuiltInPlaylist(BuiltInPlaylist.Top) }
+                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.Top) },
+                    modifier = Modifier.animateItem()
                 )
             }
 
-            if (BuiltInPlaylist.History in builtInPlaylists) item(key = "history") {
-                PlaylistItem(
+            if (BuiltInPlaylist.History in builtInPlaylists) item(key = "history", span = { GridItemSpan(maxLineSpan) }) {
+                BuiltInPlaylistPill(
                     icon = R.drawable.history,
                     colorTint = colorPalette.textDisabled,
                     name = stringResource(R.string.history),
-                    songCount = null,
-                    thumbnailSize = Dimensions.thumbnails.playlist,
-                    alternative = UIStatePreferences.playlistsAsGrid,
-                    modifier = Modifier
-                        .animateItem()
-                        .clickable { onBuiltInPlaylist(BuiltInPlaylist.History) }
+                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.History) },
+                    modifier = Modifier.animateItem()
                 )
             }
 
@@ -295,6 +292,42 @@ fun HomePlaylists(
             lazyGridState = lazyGridState,
             icon = R.drawable.search,
             onClick = onSearchClick
+        )
+    }
+}
+
+@Composable
+fun BuiltInPlaylistPill(
+    @DrawableRes icon: Int,
+    colorTint: Color,
+    name: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val (colorPalette) = LocalAppearance.current
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(56.dp)
+            .clip(CircleShape)
+            .background(colorPalette.background1)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 20.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Image(
+            painter = painterResource(icon),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(colorTint),
+            modifier = Modifier.size(24.dp)
+        )
+        BasicText(
+            text = name,
+            style = LocalAppearance.current.typography.xs.semiBold.copy(color = colorPalette.text),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
