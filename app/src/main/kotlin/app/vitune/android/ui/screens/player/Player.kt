@@ -49,10 +49,7 @@ import app.vitune.android.ui.components.themed.SecondaryTextButton
 import app.vitune.android.ui.components.themed.SliderDialog
 import app.vitune.android.ui.components.themed.SliderDialogBody
 import app.vitune.android.utils.DisposableListener
-import app.vitune.android.utils.positionAndDurationState
 import app.vitune.android.utils.rememberPipHandler
-import app.vitune.android.utils.secondary
-import app.vitune.android.utils.semiBold
 import app.vitune.android.utils.shouldBePlaying
 import app.vitune.android.utils.thumbnail
 import app.vitune.compose.persist.PersistMapCleanup
@@ -161,7 +158,6 @@ fun Player(
                 ) {
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Drag handle
                     Box(
                         modifier = Modifier
                             .width(36.dp)
@@ -172,7 +168,6 @@ fun Player(
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Clean normal artwork thumbnail card
                     AsyncImage(
                         model = metadata?.artworkUri?.thumbnail(Dimensions.thumbnails.song.px),
                         contentDescription = null,
@@ -184,21 +179,20 @@ fun Player(
 
                     Spacer(modifier = Modifier.height(32.dp))
 
-                    // Title & Artist
                     Column(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.Start
                     ) {
                         BasicText(
                             text = metadata?.title?.toString().orEmpty(),
-                            style = typography.subtitle.semiBold().copy(color = colorPalette.text),
+                            style = typography.bodyLarge.copy(color = colorPalette.text),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         BasicText(
                             text = metadata?.artist?.toString().orEmpty(),
-                            style = typography.xs.secondary().copy(color = colorPalette.textSecondary),
+                            style = typography.bodyMedium.copy(color = colorPalette.textSecondary),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -206,7 +200,6 @@ fun Player(
 
                     Spacer(modifier = Modifier.weight(1f))
 
-                    // Simple controls row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
@@ -263,4 +256,3 @@ fun Player(
         }
     }
 }
-
