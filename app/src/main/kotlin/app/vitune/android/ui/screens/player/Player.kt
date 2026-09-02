@@ -299,6 +299,7 @@ fun Player(
                                 indication = ripple(bounded = false),
                                 interactionSource = remember { MutableInteractionSource() },
                                 onClick = {
+                                    
                                     if (shouldBePlaying) binder?.player?.pause()
                                     else {
                                         if (binder?.player?.playbackState == Player.STATE_IDLE) binder.player.prepare()
