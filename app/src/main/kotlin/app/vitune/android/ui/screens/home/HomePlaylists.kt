@@ -25,7 +25,7 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -192,46 +192,54 @@ fun HomePlaylists(
                 }
             }
 
+            // Fluid Interlocking Built-in Playlist Cards
             if (BuiltInPlaylist.Favorites in builtInPlaylists) item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) {
-                BuiltInPlaylistPill(
+                FluidInterlockingPlaylistPill(
                     icon = R.drawable.heart,
                     colorTint = colorPalette.red,
                     name = stringResource(R.string.favorites),
                     onClick = { onBuiltInPlaylist(BuiltInPlaylist.Favorites) },
+                    position = FluidPosition.First,
                     modifier = Modifier.animateItem()
                 )
             }
 
             if (BuiltInPlaylist.Offline in builtInPlaylists) item(key = "offline", span = { GridItemSpan(maxLineSpan) }) {
-                BuiltInPlaylistPill(
+                FluidInterlockingPlaylistPill(
                     icon = R.drawable.airplane,
                     colorTint = colorPalette.blue,
                     name = stringResource(R.string.offline),
                     onClick = { onBuiltInPlaylist(BuiltInPlaylist.Offline) },
-                    modifier = Modifier.animateItem()
+                    position = FluidPosition.Second,
+                    modifier = Modifier
+                        .animateItem()
+                        .padding(top = (-6).dp)
                 )
             }
 
             if (BuiltInPlaylist.Top in builtInPlaylists) item(key = "top", span = { GridItemSpan(maxLineSpan) }) {
-                BuiltInPlaylistPill(
+                FluidInterlockingPlaylistPill(
                     icon = R.drawable.trending,
                     colorTint = colorPalette.red,
-                    name = stringResource(
-                        R.string.format_my_top_playlist,
-                        DataPreferences.topListLength
-                    ),
+                    name = stringResource(R.string.format_my_top_playlist, DataPreferences.topListLength),
                     onClick = { onBuiltInPlaylist(BuiltInPlaylist.Top) },
-                    modifier = Modifier.animateItem()
+                    position = FluidPosition.Third,
+                    modifier = Modifier
+                        .animateItem()
+                        .padding(top = (-6).dp)
                 )
             }
 
             if (BuiltInPlaylist.History in builtInPlaylists) item(key = "history", span = { GridItemSpan(maxLineSpan) }) {
-                BuiltInPlaylistPill(
+                FluidInterlockingPlaylistPill(
                     icon = R.drawable.history,
                     colorTint = colorPalette.textDisabled,
                     name = stringResource(R.string.history),
                     onClick = { onBuiltInPlaylist(BuiltInPlaylist.History) },
-                    modifier = Modifier.animateItem()
+                    position = FluidPosition.Fourth,
+                    modifier = Modifier
+                        .animateItem()
+                        .padding(top = (-6).dp)
                 )
             }
 
@@ -296,24 +304,49 @@ fun HomePlaylists(
     }
 }
 
+enum class FluidPosition {
+    First, Second, Third, Fourth
+}
+
 @Composable
-fun BuiltInPlaylistPill(
+fun FluidInterlockingPlaylistPill(
     @DrawableRes icon: Int,
     colorTint: Color,
     name: String,
     onClick: () -> Unit,
+    position: FluidPosition,
     modifier: Modifier = Modifier
 ) {
     val (colorPalette) = LocalAppearance.current
 
+    // Custom organic shape configuration to mimic fluid blob cuts and puzzle interlocking boundaries
+    val shape = when (position) {
+        FluidPosition.First -> RoundedCornerShape(
+            topStart = 32.dp, topEnd = 32.dp,
+            bottomStart = 16.dp, bottomEnd = 36.dp
+        )
+        FluidPosition.Second -> RoundedCornerShape(
+            topStart = 24.dp, topEnd = 12.dp,
+            bottomStart = 36.dp, bottomEnd = 16.dp
+        )
+        FluidPosition.Third -> RoundedCornerShape(
+            topStart = 12.dp, topEnd = 32.dp,
+            bottomStart = 16.dp, bottomEnd = 24.dp
+        )
+        FluidPosition.Fourth -> RoundedCornerShape(
+            topStart = 24.dp, topEnd = 24.dp,
+            bottomStart = 32.dp, bottomEnd = 32.dp
+        )
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(56.dp)
-            .clip(CircleShape)
+            .height(60.dp)
+            .clip(shape)
             .background(colorPalette.background1)
             .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 24.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(16.dp)
     ) {
