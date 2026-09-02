@@ -59,6 +59,7 @@ import app.vitune.android.ui.components.FadingRow
 import app.vitune.android.ui.components.SeekBar
 import app.vitune.android.ui.components.themed.BigIconButton
 import app.vitune.android.ui.components.themed.IconButton
+import app.vitune.android.ui.screens.albumRoute
 import app.vitune.android.ui.screens.artistRoute
 import app.vitune.android.utils.bold
 import app.vitune.android.utils.forceSeekToNext
@@ -386,7 +387,12 @@ private fun MediaInfo(media: UiMedia) {
                 BasicText(
                     text = title,
                     style = typography.l.bold,
-                    maxLines = 1
+                    maxLines = 1,
+                    modifier = Modifier.clickable {
+                        media.album?.id?.let { albumId ->
+                            albumRoute.global(albumId)
+                        }
+                    }
                 )
             }
         }
@@ -453,3 +459,4 @@ private fun MediaInfo(media: UiMedia) {
         }
     }
 }
+
