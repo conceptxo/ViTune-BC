@@ -547,13 +547,19 @@ fun Player(
                         )
                     }
                 },
+                onTitleClick = {
+                    // TODO: Handle navigation to song/album details
+                },
+                onArtistClick = {
+                    // TODO: Handle navigation to artist details
+                },
                 modifier = Modifier
                     .padding(vertical = 8.dp)
                     .fillMaxWidth()
                     .weight(1f)
             )
         }
-
+        
         if (audioDialogOpen) SliderDialog(
             onDismiss = { audioDialogOpen = false },
             title = stringResource(R.string.playback_settings)
