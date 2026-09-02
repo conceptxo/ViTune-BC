@@ -351,7 +351,9 @@ fun BitChordPlayer(
                     model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f)
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f)
                 )
 
                 Lyrics(
@@ -362,12 +364,15 @@ fun BitChordPlayer(
                     mediaMetadataProvider = { mediaItem.mediaMetadata },
                     durationProvider = { binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET },
                     onOpenDialog = {},
-                    modifier = Modifier.fillMaxWidth().aspectRatio(1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(1f),
                     shouldShowSynchronizedLyrics = PlayerPreferences.isShowingSynchronizedLyrics,
                     setShouldShowSynchronizedLyrics = { PlayerPreferences.isShowingSynchronizedLyrics = it },
                     showControls = true
                 )
             }
+            
 
             Spacer(modifier = Modifier.height(20.dp))
 
