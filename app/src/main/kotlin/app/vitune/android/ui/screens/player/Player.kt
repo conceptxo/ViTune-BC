@@ -123,19 +123,22 @@ fun Player(
         topEnd = 12.dp
     ),
     windowInsets: WindowInsets = WindowInsets.systemBars
-) = with(PlayerPreferences) {
+) {
+    val routeHandler = LocalRouteHandler.current
     val menuState = LocalMenuState.current
     val (colorPalette, typography, thumbnailCornerSize) = LocalAppearance.current
     val binder = LocalPlayerServiceBinder.current
     val pipHandler = rememberPipHandler()
 
-    PersistMapCleanup(prefix = "queue/suggestions")
-    var mediaItem by remember(binder) {
-        mutableStateOf(
-            value = binder?.player?.currentMediaItem,
-            policy = neverEqualPolicy()
-        )
-    }
+    with(PlayerPreferences) {
+        PersistMapCleanup(prefix = "queue/suggestions")
+        var mediaItem by remember(binder) {
+            mutableStateOf(
+                value = binder?.player?.currentMediaItem,
+                policy = neverEqualPolicy()
+            )
+        }
+        
     var shouldBePlaying by remember(binder) { mutableStateOf(binder?.player?.shouldBePlaying == true) }
 
     LaunchedEffect(mediaItem) {
@@ -702,6 +705,7 @@ fun Player(
             modifier = Modifier.align(Alignment.BottomCenter),
             shape = shape
         )
+      }
     }
 }
 
