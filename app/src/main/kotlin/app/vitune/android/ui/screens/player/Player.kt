@@ -77,6 +77,8 @@ import app.vitune.android.ui.components.BottomSheet
 import app.vitune.android.ui.components.BottomSheetState
 import app.vitune.android.ui.components.LocalMenuState
 import app.vitune.android.ui.components.rememberBottomSheetState
+import app.vitune.android.ui.screens.albumRoute
+import app.vitune.android.ui.screens.artistRoute
 import app.vitune.android.ui.components.themed.BaseMediaItemMenu
 import app.vitune.android.ui.components.themed.IconButton
 import app.vitune.android.ui.components.themed.SecondaryTextButton
@@ -550,18 +552,16 @@ fun Player(
                 onTitleClick = {
                     mediaItem?.mediaMetadata?.let { metadata ->
                         metadata.extras?.getString("albumId")?.let { albumId ->
-                            navigator.navigate(Screen.Album(albumId))
+                            albumRoute(albumId)
                         }
                     }
                 },
                 onArtistClick = {
                     mediaItem?.mediaMetadata?.extras?.getString("artistId")?.let { artistId ->
-                        navigator.navigate(Screen.Artist(artistId))
+                        artistRoute(artistId)
                     }
                 },
-                
-                
-                
+                  
                 modifier = Modifier
                     .padding(vertical = 8.dp)
                     .fillMaxWidth()
