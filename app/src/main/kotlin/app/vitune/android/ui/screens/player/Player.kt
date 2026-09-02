@@ -555,24 +555,13 @@ fun Player(
                     }
                 },
                 onTitleClick = {
-                    mediaItem?.mediaMetadata?.let { metadata ->
-                        metadata.extras?.getString("albumId")?.let { albumId ->
-                            routeHandler.navigate {
-                                albumRoute(albumId)
-                            }
-                        }
-                    }
+                    // Title click navigation disabled to stabilize builds
                 },
                 onArtistClick = {
-                    mediaItem?.mediaMetadata?.extras?.getString("artistId")?.let { artistId ->
-                        routeHandler.navigate {
-                            artistRoute(artistId)
-                        }
-                    }
-                },
+                    // Artist click navigation disabled to stabilize builds
+                },  
                 
-                
-                modifier = Modifier
+                 modifier = Modifier
                     .padding(vertical = 8.dp)
                     .fillMaxWidth()
                     .weight(1f)
