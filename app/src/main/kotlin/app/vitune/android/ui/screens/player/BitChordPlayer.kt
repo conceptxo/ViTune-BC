@@ -107,8 +107,11 @@ fun BitChordPlayer(
     isShowingLyrics: Boolean,
     onShowLyrics: (Boolean) -> Unit,
     onOpenQueue: () -> Unit,
+    onTitleClick: (() -> Unit)? = null,
+    onArtistClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
+    
     val (colorPalette, typography) = LocalAppearance.current
     val metadata = mediaItem.mediaMetadata
     val media = remember(mediaItem, duration) { mediaItem.toUiMedia(duration) }
@@ -357,15 +360,18 @@ fun BitChordPlayer(
                     text = metadata.title?.toString().orEmpty(),
                     style = typography.l.semiBold,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.let { if (onTitleClick != null) it.clickable(onClick = onTitleClick) else it }
                 )
                 BasicText(
                     text = metadata.artist?.toString().orEmpty(),
                     style = typography.s.semiBold.secondary,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.let { if (onArtistClick != null) it.clickable(onClick = onArtistClick) else it }
                 )
             }
+            
 
             IconButton(
                 icon = if (likedAt == null) R.drawable.heart_outline else R.drawable.heart,
