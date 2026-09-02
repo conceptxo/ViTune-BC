@@ -491,10 +491,16 @@ fun Player(
                 setLikedAt = { likedAt = it },
                 shouldBePlaying = shouldBePlaying,
                 position = position,
-                modifier = innerModifier
+                modifier = innerModifier,
+                onTitleClick = {
+                    // TODO: Add your navigation action for the song/album here
+                },
+                onArtistClick = {
+                    // TODO: Add your navigation action for the artist here
+                }
             )
         }
-
+        
         if (isLandscape) Row(
             verticalAlignment = Alignment.CenterVertically,
             modifier = containerModifier.padding(top = 32.dp)
