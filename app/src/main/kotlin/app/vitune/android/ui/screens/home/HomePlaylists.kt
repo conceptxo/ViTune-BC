@@ -1,26 +1,47 @@
 package app.vitune.android.ui.screens.home
 
+import androidx.annotation.DrawableRes
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.vitune.android.Database
 import app.vitune.android.LocalPlayerAwareWindowInsets
@@ -28,6 +49,7 @@ import app.vitune.android.R
 import app.vitune.android.models.PipedSession
 import app.vitune.android.models.Playlist
 import app.vitune.android.models.PlaylistPreview
+import app.vitune.android.preferences.DataPreferences
 import app.vitune.android.preferences.OrderPreferences
 import app.vitune.android.preferences.UIStatePreferences
 import app.vitune.android.query
@@ -36,10 +58,15 @@ import app.vitune.android.ui.components.themed.Header
 import app.vitune.android.ui.components.themed.HeaderIconButton
 import app.vitune.android.ui.components.themed.SecondaryTextButton
 import app.vitune.android.ui.components.themed.TextFieldDialog
+import app.vitune.android.ui.components.themed.VerticalDivider
 import app.vitune.android.ui.items.PlaylistItem
 import app.vitune.android.ui.screens.Route
 import app.vitune.android.ui.screens.builtinplaylist.BuiltInPlaylistScreen
 import app.vitune.android.ui.screens.settings.SettingsEntryGroupText
+import app.vitune.android.ui.screens.settings.SettingsGroupSpacer
+import app.vitune.android.utils.semiBold
+import app.vitune.compose.persist.persist
+import app.vitune.compose.persist.persistList
 import app.vitune.core.data.enums.BuiltInPlaylist
 import app.vitune.core.data.enums.PlaylistSortBy
 import app.vitune.core.data.enums.SortOrder
@@ -47,8 +74,6 @@ import app.vitune.core.ui.Dimensions
 import app.vitune.core.ui.LocalAppearance
 import app.vitune.providers.piped.Piped
 import app.vitune.providers.piped.models.Session
-import app.vitune.compose.persist.persist
-import app.vitune.compose.persist.persistList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.async
 import app.vitune.providers.piped.models.PlaylistPreview as PipedPlaylistPreview
@@ -74,7 +99,6 @@ fun HomePlaylists(
             }
         }
     )
-
     var items by persistList<PlaylistPreview>("home/playlists")
     var pipedSessions by persist<Map<PipedSession, List<PipedPlaylistPreview>?>>("home/piped")
 
@@ -94,26 +118,34 @@ fun HomePlaylists(
         }
     }
 
+    val sortOrderIconRotation by animateFloatAsState(
+        targetValue = if (playlistSortOrder == SortOrder.Ascending) 0f else 180f,
+        animationSpec = tween(durationMillis = 400, easing = LinearEasing),
+        label = ""
+    )
+
     val lazyGridState = rememberLazyGridState()
+
     val builtInPlaylists by BuiltInPlaylistScreen.shownPlaylistsAsState()
 
-    val showFloatingActionsContainer = lazyGridState.firstVisibleItemIndex > 0 ||
-            lazyGridState.firstVisibleItemScrollOffset > 0
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorPalette.background0)
-    ) {
+    Box {
         LazyVerticalGrid(
-            columns = GridCells.Fixed(2),
             state = lazyGridState,
+            columns = if (UIStatePreferences.playlistsAsGrid)
+                GridCells.Adaptive(Dimensions.thumbnails.playlist + Dimensions.items.alternativePadding * 2)
+            else GridCells.Fixed(1),
             contentPadding = LocalPlayerAwareWindowInsets.current
-                .only(WindowInsetsSides.Vertical + WindowInsetsSides.Horizontal)
+                .only(WindowInsetsSides.Vertical + WindowInsetsSides.End)
                 .asPaddingValues(),
-            modifier = Modifier.fillMaxSize()
+            horizontalArrangement = Arrangement.spacedBy(Dimensions.items.alternativePadding),
+            verticalArrangement = if (UIStatePreferences.playlistsAsGrid)
+                Arrangement.spacedBy(Dimensions.items.alternativePadding)
+            else Arrangement.Top,
+            modifier = Modifier
+                .fillMaxSize()
+                .background(colorPalette.background0)
         ) {
-            item(key = "header", span = { GridItemSpan(2) }) {
+            item(key = "header", contentType = 0, span = { GridItemSpan(maxLineSpan) }) {
                 Header(title = stringResource(R.string.playlists)) {
                     SecondaryTextButton(
                         text = stringResource(R.string.new_playlist),
@@ -124,63 +156,211 @@ fun HomePlaylists(
 
                     HeaderIconButton(
                         icon = if (UIStatePreferences.playlistsAsGrid) R.drawable.grid else R.drawable.list,
-                        onClick = { UIStatePreferences.playlistsAsGrid = !UIStatePreferences.playlistsAsGrid }
+                        onClick = {
+                            UIStatePreferences.playlistsAsGrid = !UIStatePreferences.playlistsAsGrid
+                        }
+                    )
+
+                    VerticalDivider(modifier = Modifier.height(8.dp))
+
+                    HeaderIconButton(
+                        icon = R.drawable.medical,
+                        enabled = playlistSortBy == PlaylistSortBy.SongCount,
+                        onClick = { playlistSortBy = PlaylistSortBy.SongCount }
                     )
 
                     HeaderIconButton(
-                        icon = R.drawable.search,
-                        onClick = onSearchClick
+                        icon = R.drawable.text,
+                        enabled = playlistSortBy == PlaylistSortBy.Name,
+                        onClick = { playlistSortBy = PlaylistSortBy.Name }
+                    )
+
+                    HeaderIconButton(
+                        icon = R.drawable.time,
+                        enabled = playlistSortBy == PlaylistSortBy.DateAdded,
+                        onClick = { playlistSortBy = PlaylistSortBy.DateAdded }
+                    )
+
+                    Spacer(modifier = Modifier.width(2.dp))
+
+                    HeaderIconButton(
+                        icon = R.drawable.arrow_up,
+                        color = colorPalette.text,
+                        onClick = { playlistSortOrder = !playlistSortOrder },
+                        modifier = Modifier.graphicsLayer { rotationZ = sortOrderIconRotation }
                     )
                 }
             }
 
-            // 2x2 Bento Grid Layout for Built-in Playlists
-            items(builtInPlaylists, key = { "builtin_${it.name}" }) { builtInPlaylist ->
-                PlaylistItem(
-                    icon = builtInPlaylist.icon,
-                    colorTint = colorPalette.accent,
-                    name = stringResource(builtInPlaylist.title),
-                    songCount = null,
-                    thumbnailSize = Dimensions.thumbnails.playlist,
-                    onClick = { onBuiltInPlaylist(builtInPlaylist) },
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
+            // Fluid Interlocking Built-in Playlist Cards
+            if (BuiltInPlaylist.Favorites in builtInPlaylists) item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) {
+                FluidInterlockingPlaylistPill(
+                    icon = R.drawable.heart,
+                    colorTint = colorPalette.red,
+                    name = stringResource(R.string.favorites),
+                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.Favorites) },
+                    position = FluidPosition.First,
+                    modifier = Modifier.animateItem()
                 )
             }
 
-            // User Playlists spanning full width below
-            items(items, key = { it.id }, span = { GridItemSpan(2) }) { playlist ->
-                PlaylistItem(
-                    playlist = playlist,
-                    thumbnailSize = Dimensions.thumbnails.playlist,
-                    onClick = { onPlaylistClick(playlist.toPlaylist()) },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+            if (BuiltInPlaylist.Offline in builtInPlaylists) item(key = "offline", span = { GridItemSpan(maxLineSpan) }) {
+                FluidInterlockingPlaylistPill(
+                    icon = R.drawable.airplane,
+                    colorTint = colorPalette.blue,
+                    name = stringResource(R.string.offline),
+                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.Offline) },
+                    position = FluidPosition.Second,
+                    modifier = Modifier
+                        .animateItem()
+                        .padding(top = (-6).dp)
                 )
             }
 
-            for ((session, playlists) in pipedSessions) {
-                if (playlists == null) continue
-
-                item(key = "piped_${session.id}_header", span = { GridItemSpan(2) }) {
-                    SettingsEntryGroupText(title = session.name)
-                }
-
-                items(playlists, key = { "piped_${session.id}_${it.id}" }, span = { GridItemSpan(2) }) { playlist ->
-                    PlaylistItem(
-                        thumbnailUrl = playlist.thumbnailUrl,
-                        songCount = playlist.songCount,
-                        name = playlist.name,
-                        channelName = null,
-                        thumbnailSize = Dimensions.thumbnails.playlist,
-                        onClick = { onPipedPlaylistClick(session.toApiSession(), playlist) },
-                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
-                    )
-                }
+            if (BuiltInPlaylist.Top in builtInPlaylists) item(key = "top", span = { GridItemSpan(maxLineSpan) }) {
+                FluidInterlockingPlaylistPill(
+                    icon = R.drawable.trending,
+                    colorTint = colorPalette.red,
+                    name = stringResource(R.string.format_my_top_playlist, DataPreferences.topListLength),
+                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.Top) },
+                    position = FluidPosition.Third,
+                    modifier = Modifier
+                        .animateItem()
+                        .padding(top = (-6).dp)
+                )
             }
+
+            if (BuiltInPlaylist.History in builtInPlaylists) item(key = "history", span = { GridItemSpan(maxLineSpan) }) {
+                FluidInterlockingPlaylistPill(
+                    icon = R.drawable.history,
+                    colorTint = colorPalette.textDisabled,
+                    name = stringResource(R.string.history),
+                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.History) },
+                    position = FluidPosition.Fourth,
+                    modifier = Modifier
+                        .animateItem()
+                        .padding(top = (-6).dp)
+                )
+            }
+
+            items(
+                items = items,
+                key = { it.playlist.id }
+            ) { playlistPreview ->
+                PlaylistItem(
+                    playlist = playlistPreview,
+                    thumbnailSize = Dimensions.thumbnails.playlist,
+                    alternative = UIStatePreferences.playlistsAsGrid,
+                    modifier = Modifier
+                        .clickable(onClick = { onPlaylistClick(playlistPreview.playlist) })
+                        .animateItem(fadeInSpec = null, fadeOutSpec = null)
+                )
+            }
+
+            pipedSessions
+                ?.ifEmpty { null }
+                ?.filter { it.value?.isNotEmpty() == true }
+                ?.forEach { (session, playlists) ->
+                    item(
+                        key = "piped-header-${session.username}",
+                        contentType = 0,
+                        span = { GridItemSpan(maxLineSpan) }
+                    ) {
+                        SettingsGroupSpacer()
+                        SettingsEntryGroupText(title = session.username)
+                    }
+
+                    playlists?.let {
+                        items(
+                            items = playlists,
+                            key = { "piped-${session.username}-${it.id}" }
+                        ) { playlist ->
+                            PlaylistItem(
+                                name = playlist.name,
+                                songCount = playlist.videoCount,
+                                channelName = null,
+                                thumbnailUrl = playlist.thumbnailUrl.toString(),
+                                thumbnailSize = Dimensions.thumbnails.playlist,
+                                alternative = UIStatePreferences.playlistsAsGrid,
+                                modifier = Modifier
+                                    .clickable(onClick = {
+                                        onPipedPlaylistClick(
+                                            session.toApiSession(),
+                                            playlist
+                                        )
+                                    })
+                                    .animateItem(fadeInSpec = null, fadeOutSpec = null)
+                            )
+                        }
+                    }
+                }
         }
 
         FloatingActionsContainerWithScrollToTop(
             lazyGridState = lazyGridState,
-            visible = showFloatingActionsContainer
+            icon = R.drawable.search,
+            onClick = onSearchClick
+        )
+    }
+}
+
+enum class FluidPosition {
+    First, Second, Third, Fourth
+}
+
+@Composable
+fun FluidInterlockingPlaylistPill(
+    @DrawableRes icon: Int,
+    colorTint: Color,
+    name: String,
+    onClick: () -> Unit,
+    position: FluidPosition,
+    modifier: Modifier = Modifier
+) {
+    val (colorPalette) = LocalAppearance.current
+
+    // Custom organic shape configuration to mimic fluid blob cuts and puzzle interlocking boundaries
+    val shape = when (position) {
+        FluidPosition.First -> RoundedCornerShape(
+            topStart = 32.dp, topEnd = 32.dp,
+            bottomStart = 16.dp, bottomEnd = 36.dp
+        )
+        FluidPosition.Second -> RoundedCornerShape(
+            topStart = 24.dp, topEnd = 12.dp,
+            bottomStart = 36.dp, bottomEnd = 16.dp
+        )
+        FluidPosition.Third -> RoundedCornerShape(
+            topStart = 12.dp, topEnd = 32.dp,
+            bottomStart = 16.dp, bottomEnd = 24.dp
+        )
+        FluidPosition.Fourth -> RoundedCornerShape(
+            topStart = 24.dp, topEnd = 24.dp,
+            bottomStart = 32.dp, bottomEnd = 32.dp
+        )
+    }
+
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .height(60.dp)
+            .clip(shape)
+            .background(colorPalette.background1)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 24.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Image(
+            painter = painterResource(icon),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(colorTint),
+            modifier = Modifier.size(24.dp)
+        )
+        BasicText(
+            text = name,
+            style = LocalAppearance.current.typography.xs.semiBold.copy(color = colorPalette.text),
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
