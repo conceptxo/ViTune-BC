@@ -71,7 +71,6 @@ android {
             versionNameSuffix = "-RELEASE"
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("debug")
             manifestPlaceholders["appName"] = "ViTune"
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
