@@ -23,19 +23,16 @@ import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -46,12 +43,9 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.fastForEachIndexed
 import androidx.media3.common.Player
-import app.vitune.android.Database
 import app.vitune.android.LocalPlayerServiceBinder
 import app.vitune.android.R
-import app.vitune.android.models.Info
 import app.vitune.android.models.ui.UiMedia
 import app.vitune.android.preferences.PlayerPreferences
 import app.vitune.android.service.PlayerService
@@ -59,19 +53,13 @@ import app.vitune.android.ui.components.FadingRow
 import app.vitune.android.ui.components.SeekBar
 import app.vitune.android.ui.components.themed.BigIconButton
 import app.vitune.android.ui.components.themed.IconButton
-import app.vitune.android.ui.screens.albumRoute
-import app.vitune.android.ui.screens.artistRoute
 import app.vitune.android.utils.bold
 import app.vitune.android.utils.forceSeekToNext
 import app.vitune.android.utils.forceSeekToPrevious
 import app.vitune.android.utils.secondary
-import app.vitune.android.utils.semiBold
 import app.vitune.core.ui.LocalAppearance
 import app.vitune.core.ui.favoritesIcon
-import app.vitune.core.ui.utils.px
 import app.vitune.core.ui.utils.roundedShape
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
 private val DefaultOffset = 24.dp
 
@@ -223,6 +211,7 @@ private fun ClassicControls(
         Spacer(modifier = Modifier.weight(1f))
     }
 }
+
 @Composable
 private fun ModernControls(
     media: UiMedia,
@@ -303,6 +292,7 @@ private fun ModernControls(
         Spacer(modifier = Modifier.weight(1f))
     }
 }
+
 @Composable
 private fun SkipButton(
     @DrawableRes iconId: Int,
@@ -310,7 +300,6 @@ private fun SkipButton(
     modifier: Modifier = Modifier,
     offsetOnPress: Dp = DefaultOffset
 ) {
-    val binder = LocalPlayerServiceBinder.current
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
 
@@ -375,6 +364,7 @@ private fun PlayButton(
         )
     }
 }
+
 @Composable
 private fun AnimatedPlayPauseButton(
     playing: Boolean,
@@ -409,7 +399,6 @@ private fun MediaInfo(media: UiMedia) {
         modifier = Modifier.fillMaxWidth()
     ) {
         FadingRow(
-            edgeColor = colorPalette.background1,
             modifier = Modifier
                 .fillMaxWidth()
                 .onGloballyPositioned { rowWidth = it.size.width }
@@ -433,7 +422,6 @@ private fun MediaInfo(media: UiMedia) {
         Spacer(modifier = Modifier.height(4.dp))
 
         FadingRow(
-            edgeColor = colorPalette.background1,
             modifier = Modifier.fillMaxWidth()
         ) {
             BasicText(
