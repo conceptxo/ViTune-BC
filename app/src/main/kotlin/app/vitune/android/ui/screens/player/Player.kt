@@ -557,19 +557,16 @@ fun Player(
                 onTitleClick = {
                     mediaItem?.mediaMetadata?.let { metadata ->
                         metadata.extras?.getString("albumId")?.let { albumId ->
-                            with(routeHandler) {
-                                albumRoute?.invoke(albumId)
-                            }
+                            routeHandler?.albumRoute?.invoke(albumId)
                         }
                     }
                 },
                 onArtistClick = {
                     mediaItem?.mediaMetadata?.extras?.getString("artistId")?.let { artistId ->
-                        with(routeHandler) {
-                            artistRoute?.invoke(artistId)
-                        }
+                        routeHandler?.artistRoute?.invoke(artistId)
                     }
                 },
+                
                 
                 
                   
