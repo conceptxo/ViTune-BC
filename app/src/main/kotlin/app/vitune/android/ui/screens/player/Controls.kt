@@ -68,7 +68,9 @@ fun Controls(
     shouldBePlaying: Boolean,
     position: Long,
     modifier: Modifier = Modifier,
-    layout: PlayerPreferences.PlayerLayout = PlayerPreferences.playerLayout
+    layout: PlayerPreferences.PlayerLayout = PlayerPreferences.playerLayout,
+    onTitleClick: () -> Unit = {},
+    onArtistClick: () -> Unit = {}
 ) {
     val shouldBePlayingTransition = updateTransition(
         targetState = shouldBePlaying,
@@ -90,7 +92,9 @@ fun Controls(
             likedAt = likedAt,
             setLikedAt = setLikedAt,
             playButtonRadius = playButtonRadius,
-            modifier = modifier
+            modifier = modifier,
+            onTitleClick = onTitleClick,
+            onArtistClick = onArtistClick
         )
 
         PlayerPreferences.PlayerLayout.New -> ModernControls(
@@ -101,7 +105,9 @@ fun Controls(
             likedAt = likedAt,
             setLikedAt = setLikedAt,
             playButtonRadius = playButtonRadius,
-            modifier = modifier
+            modifier = modifier,
+            onTitleClick = onTitleClick,
+            onArtistClick = onArtistClick
         )
     }
 }
@@ -115,7 +121,9 @@ private fun ClassicControls(
     likedAt: Long?,
     setLikedAt: (Long?) -> Unit,
     playButtonRadius: Dp,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onTitleClick: () -> Unit = {},
+    onArtistClick: () -> Unit = {}
 ) = with(PlayerPreferences) {
     val (colorPalette) = LocalAppearance.current
 
@@ -126,7 +134,7 @@ private fun ClassicControls(
             .padding(horizontal = 32.dp)
     ) {
         Spacer(modifier = Modifier.weight(1f))
-        MediaInfo(media)
+        MediaInfo(media = media, onTitleClick = onTitleClick, onArtistClick = onArtistClick)
         Spacer(modifier = Modifier.weight(1f))
         SeekBar(
             binder = binder,
@@ -218,7 +226,9 @@ private fun ModernControls(
     setLikedAt: (Long?) -> Unit,
     playButtonRadius: Dp,
     modifier: Modifier = Modifier,
-    controlHeight: Dp = 64.dp
+    controlHeight: Dp = 64.dp,
+    onTitleClick: () -> Unit = {},
+    onArtistClick: () -> Unit = {}
 ) {
     val previousButtonContent: @Composable RowScope.() -> Unit = {
         SkipButton(
@@ -246,7 +256,7 @@ private fun ModernControls(
             .padding(horizontal = 32.dp)
     ) {
         Spacer(modifier = Modifier.weight(1f))
-        MediaInfo(media)
+        MediaInfo(media = media, onTitleClick = onTitleClick, onArtistClick = onArtistClick)
         Spacer(modifier = Modifier.weight(1f))
 
         Row(
@@ -362,7 +372,11 @@ private fun PlayButton(
 }
 
 @Composable
-private fun MediaInfo(media: UiMedia) {
+private fun MediaInfo(
+    media: UiMedia,
+    onTitleClick: () -> Unit,
+    onArtistClick: () -> Unit
+) {
     val (colorPalette) = LocalAppearance.current
     var textWidth by remember { mutableIntStateOf(0) }
     var rowWidth by remember { mutableIntStateOf(0) }
@@ -374,6 +388,7 @@ private fun MediaInfo(media: UiMedia) {
         FadingRow(
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable(enabled = true, onClick = onTitleClick)
                 .onGloballyPositioned { rowWidth = it.size.width }
         ) {
             BasicText(
@@ -395,7 +410,9 @@ private fun MediaInfo(media: UiMedia) {
         Spacer(modifier = Modifier.height(4.dp))
 
         FadingRow(
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable(enabled = true, onClick = onArtistClick)
         ) {
             BasicText(
                 text = media.artist,
@@ -405,3 +422,4 @@ private fun MediaInfo(media: UiMedia) {
         }
     }
 }
+
