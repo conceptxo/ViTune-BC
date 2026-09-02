@@ -223,7 +223,6 @@ private fun ClassicControls(
         Spacer(modifier = Modifier.weight(1f))
     }
 }
-
 @Composable
 private fun ModernControls(
     media: UiMedia,
@@ -304,7 +303,6 @@ private fun ModernControls(
         Spacer(modifier = Modifier.weight(1f))
     }
 }
-
 @Composable
 private fun SkipButton(
     @DrawableRes iconId: Int,
@@ -312,25 +310,38 @@ private fun SkipButton(
     modifier: Modifier = Modifier,
     offsetOnPress: Dp = DefaultOffset
 ) {
+    val binder = LocalPlayerServiceBinder.current
     val interactionSource = remember { MutableInteractionSource() }
-    val pressed by interactionSource.collectIsPressedAsState()
-    val offset by animateDpAsState(
-        targetValue = if (pressed) offsetOnPress else 0.dp,
-        label = ""
+    val isPressed by interactionSource.collectIsPressedAsState()
+
+    val offsetY by animateDpAsState(
+        targetValue = if (isPressed) offsetOnPress else 0.dp,
+        label = "skipButtonOffset"
     )
 
-    BigIconButton(
-        iconId = iconId,
+    val (colorPalette) = LocalAppearance.current
+
+    Box(
         modifier = modifier
+            .height(64.dp)
+            .clip(64.dp.roundedShape)
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
                 onClick = onClick
             )
-            .offset {
-                IntOffset(x = offset.roundToPx(), y = 0)
-            }
-    )
+            .background(colorPalette.background2)
+    ) {
+        Image(
+            painter = painterResource(iconId),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(colorPalette.text),
+            modifier = Modifier
+                .align(Alignment.Center)
+                .offset { IntOffset(0, offsetY.roundToPx()) }
+                .size(24.dp)
+        )
+    }
 }
 
 @Composable
@@ -339,19 +350,22 @@ private fun PlayButton(
     shouldBePlaying: Boolean,
     modifier: Modifier = Modifier
 ) {
-    val (colorPalette) = LocalAppearance.current
     val binder = LocalPlayerServiceBinder.current
+    val (colorPalette) = LocalAppearance.current
 
     Box(
         modifier = modifier
             .clip(radius.roundedShape)
             .clickable {
-                if (shouldBePlaying) binder?.player?.pause() else {
-                    if (binder?.player?.playbackState == Player.STATE_IDLE) binder.player.prepare()
-                    binder?.player?.play()
+                if (binder != null) {
+                    if (shouldBePlaying) binder.player.pause()
+                    else {
+                        if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
+                        binder.player.play()
+                    }
                 }
             }
-            .background(colorPalette.accent)
+            .background(colorPalette.background2)
     ) {
         AnimatedPlayPauseButton(
             playing = shouldBePlaying,
@@ -361,102 +375,72 @@ private fun PlayButton(
         )
     }
 }
-
 @Composable
-private fun MediaInfo(media: UiMedia) {
-    val (colorPalette, typography) = LocalAppearance.current
+private fun AnimatedPlayPauseButton(
+    playing: Boolean,
+    modifier: Modifier = Modifier
+) {
+    val (colorPalette) = LocalAppearance.current
 
-    var artistInfo: List<Info>? by remember { mutableStateOf(null) }
-    var maxHeight by rememberSaveable { mutableIntStateOf(0) }
-
-    LaunchedEffect(media) {
-        withContext(Dispatchers.IO) {
-            artistInfo = Database
-                .songArtistInfo(media.id)
-                .takeIf { it.isNotEmpty() }
-        }
-    }
-
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        AnimatedContent(
-            targetState = media.title,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = ""
-        ) { title ->
-            FadingRow(modifier = Modifier.fillMaxWidth(0.75f)) {
-                BasicText(
-                    text = title,
-                    style = typography.l.bold,
-                    maxLines = 1,
-                    modifier = Modifier.clickable {
-                        media.album?.id?.let { albumId ->
-                            albumRoute.global(albumId)
-                        }
-                    }
-                )
-            }
-        }
-
-        AnimatedContent(
-            targetState = media to artistInfo,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
-            label = ""
-        ) { (media, state) ->
-            state?.let { artists ->
-                FadingRow(
-                    modifier = Modifier
-                        .fillMaxWidth(0.75f)
-                        .heightIn(maxHeight.px.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    artists.fastForEachIndexed { i, artist ->
-                        if (i == artists.lastIndex && artists.size > 1) BasicText(
-                            text = " & ",
-                            style = typography.s.semiBold.secondary
-                        )
-                        BasicText(
-                            text = artist.name.orEmpty(),
-                            style = typography.s.bold.secondary,
-                            modifier = Modifier.clickable { artistRoute.global(artist.id) }
-                        )
-                        if (i != artists.lastIndex && i + 1 != artists.lastIndex) BasicText(
-                            text = ", ",
-                            style = typography.s.semiBold.secondary
-                        )
-                    }
-                    if (media.explicit) {
-                        Spacer(Modifier.width(4.dp))
-
-                        Image(
-                            painter = painterResource(R.drawable.explicit),
-                            contentDescription = null,
-                            colorFilter = ColorFilter.tint(colorPalette.text),
-                            modifier = Modifier.size(15.dp)
-                        )
-                    }
-                }
-            } ?: FadingRow(
-                modifier = Modifier.fillMaxWidth(0.75f),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                BasicText(
-                    text = media.artist,
-                    style = typography.s.semiBold.secondary,
-                    maxLines = 1,
-                    modifier = Modifier.onGloballyPositioned { maxHeight = it.size.height }
-                )
-                if (media.explicit) {
-                    Spacer(Modifier.width(4.dp))
-
-                    Image(
-                        painter = painterResource(R.drawable.explicit),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(colorPalette.text),
-                        modifier = Modifier.size(15.dp)
-                    )
-                }
-            }
-        }
+    AnimatedContent(
+        targetState = playing,
+        transitionSpec = {
+            fadeIn(tween(100)) togetherWith fadeOut(tween(100))
+        },
+        label = "playPauseAnimation",
+        modifier = modifier
+    ) { isPlaying ->
+        Image(
+            painter = painterResource(if (isPlaying) R.drawable.pause else R.drawable.play),
+            contentDescription = null,
+            colorFilter = ColorFilter.tint(colorPalette.text)
+        )
     }
 }
 
+@Composable
+private fun MediaInfo(media: UiMedia) {
+    val (colorPalette) = LocalAppearance.current
+    var textWidth by remember { mutableIntStateOf(0) }
+    var rowWidth by remember { mutableIntStateOf(0) }
+
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        FadingRow(
+            edgeColor = colorPalette.background1,
+            modifier = Modifier
+                .fillMaxWidth()
+                .onGloballyPositioned { rowWidth = it.size.width }
+        ) {
+            BasicText(
+                text = media.title,
+                style = MaterialTheme.typography.titleMedium.bold().copy(color = colorPalette.text),
+                maxLines = 1,
+                modifier = Modifier
+                    .onGloballyPositioned { textWidth = it.size.width }
+                    .then(
+                        if (textWidth > rowWidth) {
+                            Modifier.padding(horizontal = 16.dp)
+                        } else {
+                            Modifier
+                        }
+                    )
+            )
+        }
+
+        Spacer(modifier = Modifier.height(4.dp))
+
+        FadingRow(
+            edgeColor = colorPalette.background1,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            BasicText(
+                text = media.artists.joinToString(", ") { it.name },
+                style = MaterialTheme.typography.bodyMedium.secondary().copy(color = colorPalette.textSecondary),
+                maxLines = 1
+            )
+        }
+    }
+}
