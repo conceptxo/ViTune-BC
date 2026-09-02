@@ -352,8 +352,7 @@ fun BitChordPlayer(
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f)
+                        .fillMaxSize()
                 )
 
                 Lyrics(
@@ -363,17 +362,16 @@ fun BitChordPlayer(
                     ensureSongInserted = { Database.insert(mediaItem) },
                     mediaMetadataProvider = { mediaItem.mediaMetadata },
                     durationProvider = { binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET },
+                    
                     onOpenDialog = {},
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(1f),
+                        .fillMaxSize(),
                     shouldShowSynchronizedLyrics = PlayerPreferences.isShowingSynchronizedLyrics,
                     setShouldShowSynchronizedLyrics = { PlayerPreferences.isShowingSynchronizedLyrics = it },
                     showControls = true
                 )
             }
             
-
             Spacer(modifier = Modifier.height(20.dp))
 
             Row(
