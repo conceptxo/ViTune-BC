@@ -1,9 +1,5 @@
 package app.vitune.android.ui.screens.player
 
-import moe.rukamori.archivetune.ui.player.player_0.UnifiedPlayerSheetV2
-import moe.rukamori.archivetune.ui.player.player_0.buttons.PlayerAction
-import moe.rukamori.archivetune.ui.player.player_0.PlayerUiState
-import moe.rukamori.archivetune.ui.player.player_0.QueueUiState
 import app.vitune.compose.routing.LocalRouteHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
@@ -149,7 +145,8 @@ fun Player(
                 layoutState.collapseSoft()
             }
         }
-                var likedAt by remember(mediaItem) {
+
+        var likedAt by remember(mediaItem) {
             mutableStateOf(
                 value = null,
                 policy = object : SnapshotMutationPolicy<Long?> {
@@ -199,167 +196,4 @@ fun Player(
             .asPaddingValues()
 
         OnGlobalRoute { if (layoutState.expanded) layoutState.collapseSoft() }
-
-        var isShowingStatsForNerds by rememberSaveable { mutableStateOf(false) }
-        var isShowingLyricsDialog by rememberSaveable { mutableStateOf(false) }
-        var audioDialogOpen by rememberSaveable { mutableStateOf(false) }
-        var boostDialogOpen by rememberSaveable { mutableStateOf(false) }
-
-        if (mediaItem != null) {
-            UnifiedPlayerSheetV2(
-                state = PlayerUiState(
-                    mediaId = mediaItem?.mediaId.orEmpty(),
-                    title = metadata?.title?.toString().orEmpty(),
-                    artist = metadata?.artist?.toString().orEmpty(),
-                    coverUrl = metadata?.artworkUri?.toString().orEmpty(),
-                    isPlaying = shouldBePlaying,
-                    trackUrl = mediaItem?.mediaId.orEmpty(),
-                    isLyricsVisible = false,
-                    gradientColor = 0xFF121212
-                ),
-                queueState = QueueUiState(),
-                onAction = { action ->
-                    when (action) {
-                        PlayerAction.PlayPause -> {
-                            if (shouldBePlaying) binder?.player?.pause()
-                            else {
-                                if (binder?.player?.playbackState == Player.STATE_IDLE) binder?.player?.prepare()
-                                binder?.player?.play()
-                            }
-                        }
-                        PlayerAction.Next -> binder?.player?.forceSeekToNext()
-                        PlayerAction.Previous -> binder?.player?.forceSeekToPrevious()
-                        PlayerAction.Like -> {
-                            likedAt = if (likedAt == null) System.currentTimeMillis() else null
-                        }
-                        else -> {}
-                    }
-                },
-                onCloseLyricsClick = { },
-                onSearchLyricsClick = { },
-                onSeek = { positionMs -> binder?.player?.seekTo(positionMs.toLong()) },
-                onBackgroundStyleChanged = { },
-                onImmersiveChanged = { },
-                onSeekStarted = { },
-                progressMsProvider = { position },
-                bottomBarHeight = horizontalBottomPaddingValues.calculateBottomPadding()
-            )
-        }
-                if (audioDialogOpen) SliderDialog(
-            onDismiss = { audioDialogOpen = false },
-            title = stringResource(R.string.playback_settings)
-        ) {
-            SliderDialogBody(
-                provideState = { remember(speed) { mutableFloatStateOf(speed) } },
-                onSlideComplete = { speed = it },
-                min = 0f,
-                max = 2f,
-                toDisplay = {
-                    if (it <= 0.01f) stringResource(R.string.minimum_speed_value)
-                    else stringResource(R.string.format_multiplier, "%.2f".format(it))
-                },
-                steps = 39,
-                label = stringResource(R.string.playback_speed)
-            )
-            SliderDialogBody(
-                provideState = { remember(pitch) { mutableFloatStateOf(pitch) } },
-                onSlideComplete = { pitch = it },
-                min = 0f,
-                max = 2f,
-                toDisplay = {
-                    if (it <= 0.01f) stringResource(R.string.minimum_speed_value)
-                    else stringResource(R.string.format_multiplier, "%.2f".format(it))
-                },
-                steps = 39,
-                label = stringResource(R.string.playback_pitch)
-            )
-            Box(
-                modifier = Modifier.fillMaxWidth(),
-                contentAlignment = Alignment.Center
-            ) {
-                SecondaryTextButton(
-                    text = stringResource(R.string.reset),
-                    onClick = {
-                        speed = 1f
-                        pitch = 1f
-                    }
-                )
-            }
-        }
-
-        if (boostDialogOpen) {
-            fun submit(state: Float) = transaction {
-                mediaItem?.mediaId?.let { mediaId ->
-                    Database.setLoudnessBoost(
-                        songId = mediaId,
-                        loudnessBoost = state.takeUnless { it == 0f }
-                    )
-                }
-            }
-
-            SliderDialog(
-                onDismiss = { boostDialogOpen = false },
-                title = stringResource(R.string.volume_boost)
-            ) {
-                SliderDialogBody(
-                    provideState = {
-                        val state = remember { mutableFloatStateOf(0f) }
-                        LaunchedEffect(mediaItem) {
-                            mediaItem?.mediaId?.let { mediaId ->
-                                Database
-                                    .loudnessBoost(mediaId)
-                                    .distinctUntilChanged()
-                                    .collect { state.floatValue = it ?: 0f }
-                            }
-                        }
-                        state
-                    },
-                    onSlideComplete = { submit(it) },
-                    min = -20f,
-                    max = 20f,
-                    toDisplay = { stringResource(R.string.format_db, "%.2f".format(it)) }
-                )
-                Box(
-                    modifier = Modifier.fillMaxWidth(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    SecondaryTextButton(
-                        text = stringResource(R.string.reset),
-                        onClick = { submit(0f) }
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-@OptIn(UnstableApi::class)
-private fun PlayerMenu(
-    binder: PlayerService.Binder,
-    mediaItem: MediaItem,
-    onDismiss: () -> Unit,
-    onShowSpeedDialog: (() -> Unit)? = null,
-    onShowNormalizationDialog: (() -> Unit)? = null
-) {
-    val launchEqualizer by rememberEqualizerLauncher(audioSessionId = { binder.player.audioSessionId })
-
-    BaseMediaItemMenu(
-        mediaItem = mediaItem,
-        onStartRadio = {
-            binder.stopRadio()
-            binder.player.seamlessPlay(mediaItem)
-            binder.setupRadio(NavigationEndpoint.Endpoint.Watch(videoId = mediaItem.mediaId))
-        },
-        onGoToEqualizer = launchEqualizer,
-        onShowSleepTimer = {},
-        onDismiss = onDismiss,
-        onShowSpeedDialog = onShowSpeedDialog,
-        onShowNormalizationDialog = onShowNormalizationDialog
-    )
-}
-
-private fun onDismiss(binder: PlayerService.Binder) {
-    binder.stopRadio()
-    binder.player.clearMediaItems()
-}
+        
