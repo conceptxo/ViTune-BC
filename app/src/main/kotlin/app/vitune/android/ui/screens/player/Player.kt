@@ -548,7 +548,7 @@ fun Player(
                     }
                 },
                 onTitleClick = {
-                    mediaItem.mediaMetadata.let { metadata ->
+                    mediaItem?.mediaMetadata?.let { metadata ->
                         metadata.extras?.getString("albumId")?.let { albumId ->
                             // If your app navigates by album ID:
                             // navigator.navigate(Screen.Album(albumId))
@@ -556,11 +556,12 @@ fun Player(
                     }
                 },
                 onArtistClick = {
-                    mediaItem.mediaMetadata.extras?.getString("artistId")?.let { artistId ->
+                    mediaItem?.mediaMetadata?.extras?.getString("artistId")?.let { artistId ->
                         // If your app navigates by artist ID:
                         // navigator.navigate(Screen.Artist(artistId))
                     }
                 },
+                
                 
                 modifier = Modifier
                     .padding(vertical = 8.dp)
