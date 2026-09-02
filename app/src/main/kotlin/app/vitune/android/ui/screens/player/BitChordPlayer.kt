@@ -1,4 +1,4 @@
-Package app.vitune.android.ui.screens.player
+package app.vitune.android.ui.screens.player
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.Spring
@@ -127,7 +127,6 @@ fun BitChordPlayer(
     var shuffleOn by remember { mutableStateOf(binder.player.shuffleModeEnabled) }
     var repeatMode by remember { mutableStateOf(binder.player.repeatMode) }
 
-    // --- inline synced lyric line, with background auto-fetch ---
     var storedLyrics by remember(mediaItem.mediaId) { mutableStateOf<LyricsData?>(null) }
     var isFetchingLyrics by remember(mediaItem.mediaId) { mutableStateOf(false) }
 
@@ -301,15 +300,12 @@ fun BitChordPlayer(
         isFetchingLyrics -> LYRIC_SEARCH_PHRASES[searchPhraseIndex]
         else -> "Tap for lyrics"
     }
-    // --- end inline synced lyric line ---
 
-    // Root Immersive Box Container covering full screen with thumbnail and gradient blend
     Box(
         modifier = modifier
             .fillMaxSize()
             .background(colorPalette.background)
     ) {
-        // 1. Full-bleed background thumbnail image
         AsyncImage(
             model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
             contentDescription = null,
@@ -317,7 +313,6 @@ fun BitChordPlayer(
             modifier = Modifier.fillMaxSize()
         )
 
-        // 2. Smooth vertical gradient overlay to blend thumbnail smoothly into dark theme
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -332,7 +327,6 @@ fun BitChordPlayer(
                 )
         )
 
-        // 3. Main Player Column Layout stacked over the background
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
@@ -470,14 +464,14 @@ fun BitChordPlayer(
                     modifier = Modifier.size(28.dp)
                 )
 
-                     Box(
+                Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(50))
                         .clickable {
                             if (shouldBePlaying) binder.player.pause() else {
                                 if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
                                 binder.player.play()
-                            }
+                                                      }
                         }
                         .background(colorPalette.background2.copy(alpha = 0.7f))
                         .size(64.dp)
