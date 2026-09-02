@@ -548,11 +548,20 @@ fun Player(
                     }
                 },
                 onTitleClick = {
-                    // TODO: Handle navigation to song/album details
+                    mediaItem.mediaMetadata.let { metadata ->
+                        metadata.extras?.getString("albumId")?.let { albumId ->
+                            // If your app navigates by album ID:
+                            // navigator.navigate(Screen.Album(albumId))
+                        }
+                    }
                 },
                 onArtistClick = {
-                    // TODO: Handle navigation to artist details
+                    mediaItem.mediaMetadata.extras?.getString("artistId")?.let { artistId ->
+                        // If your app navigates by artist ID:
+                        // navigator.navigate(Screen.Artist(artistId))
+                    }
                 },
+                
                 modifier = Modifier
                     .padding(vertical = 8.dp)
                     .fillMaxWidth()
