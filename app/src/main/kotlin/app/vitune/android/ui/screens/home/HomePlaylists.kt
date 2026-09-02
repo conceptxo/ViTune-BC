@@ -9,6 +9,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
@@ -192,55 +193,76 @@ fun HomePlaylists(
                 }
             }
 
-            // Fluid Interlocking Built-in Playlist Cards
-            if (BuiltInPlaylist.Favorites in builtInPlaylists) item(key = "favorites", span = { GridItemSpan(maxLineSpan) }) {
-                FluidInterlockingPlaylistPill(
-                    icon = R.drawable.heart,
-                    colorTint = colorPalette.red,
-                    name = stringResource(R.string.favorites),
-                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.Favorites) },
-                    position = FluidPosition.First,
-                    modifier = Modifier.animateItem()
-                )
-            }
-
-            if (BuiltInPlaylist.Offline in builtInPlaylists) item(key = "offline", span = { GridItemSpan(maxLineSpan) }) {
-                FluidInterlockingPlaylistPill(
-                    icon = R.drawable.airplane,
-                    colorTint = colorPalette.blue,
-                    name = stringResource(R.string.offline),
-                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.Offline) },
-                    position = FluidPosition.Second,
+            // 2x2 Bento Grid Layout for Built-in Playlists
+            if (builtInPlaylists.isNotEmpty()) item(key = "built_in_grid", span = { GridItemSpan(maxLineSpan) }) {
+                Column(
+                    verticalArrangement = Arrangement.spacedBy(Dimensions.items.alternativePadding),
                     modifier = Modifier
-                        .animateItem()
-                        .padding(top = (-6).dp)
-                )
-            }
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
+                    // Row 1: Favorites & Offline side-by-side
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Dimensions.items.alternativePadding),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (BuiltInPlaylist.Favorites in builtInPlaylists) {
+                            FluidInterlockingPlaylistPill(
+                                icon = R.drawable.heart,
+                                colorTint = colorPalette.red,
+                                name = stringResource(R.string.favorites),
+                                onClick = { onBuiltInPlaylist(BuiltInPlaylist.Favorites) },
+                                position = FluidPosition.First,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .animateItem()
+                            )
+                        }
+                        if (BuiltInPlaylist.Offline in builtInPlaylists) {
+                            FluidInterlockingPlaylistPill(
+                                icon = R.drawable.airplane,
+                                colorTint = colorPalette.blue,
+                                name = stringResource(R.string.offline),
+                                onClick = { onBuiltInPlaylist(BuiltInPlaylist.Offline) },
+                                position = FluidPosition.Second,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .animateItem()
+                            )
+                        }
+                    }
 
-            if (BuiltInPlaylist.Top in builtInPlaylists) item(key = "top", span = { GridItemSpan(maxLineSpan) }) {
-                FluidInterlockingPlaylistPill(
-                    icon = R.drawable.trending,
-                    colorTint = colorPalette.red,
-                    name = stringResource(R.string.format_my_top_playlist, DataPreferences.topListLength),
-                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.Top) },
-                    position = FluidPosition.Third,
-                    modifier = Modifier
-                        .animateItem()
-                        .padding(top = (-6).dp)
-                )
-            }
-
-            if (BuiltInPlaylist.History in builtInPlaylists) item(key = "history", span = { GridItemSpan(maxLineSpan) }) {
-                FluidInterlockingPlaylistPill(
-                    icon = R.drawable.history,
-                    colorTint = colorPalette.textDisabled,
-                    name = stringResource(R.string.history),
-                    onClick = { onBuiltInPlaylist(BuiltInPlaylist.History) },
-                    position = FluidPosition.Fourth,
-                    modifier = Modifier
-                        .animateItem()
-                        .padding(top = (-6).dp)
-                )
+                    // Row 2: Top 50 & History side-by-side
+                    Row(
+                        horizontalArrangement = Arrangement.spacedBy(Dimensions.items.alternativePadding),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        if (BuiltInPlaylist.Top in builtInPlaylists) {
+                            FluidInterlockingPlaylistPill(
+                                icon = R.drawable.trending,
+                                colorTint = colorPalette.red,
+                                name = stringResource(R.string.format_my_top_playlist, DataPreferences.topListLength),
+                                onClick = { onBuiltInPlaylist(BuiltInPlaylist.Top) },
+                                position = FluidPosition.Third,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .animateItem()
+                            )
+                        }
+                        if (BuiltInPlaylist.History in builtInPlaylists) {
+                            FluidInterlockingPlaylistPill(
+                                icon = R.drawable.history,
+                                colorTint = colorPalette.textDisabled,
+                                name = stringResource(R.string.history),
+                                onClick = { onBuiltInPlaylist(BuiltInPlaylist.History) },
+                                position = FluidPosition.Fourth,
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .animateItem()
+                            )
+                        }
+                    }
+                }
             }
 
             items(
@@ -319,7 +341,6 @@ fun FluidInterlockingPlaylistPill(
 ) {
     val (colorPalette) = LocalAppearance.current
 
-    // Custom organic shape configuration to mimic fluid blob cuts and puzzle interlocking boundaries
     val shape = when (position) {
         FluidPosition.First -> RoundedCornerShape(
             topStart = 32.dp, topEnd = 32.dp,
@@ -346,9 +367,9 @@ fun FluidInterlockingPlaylistPill(
             .clip(shape)
             .background(colorPalette.background1)
             .clickable(onClick = onClick)
-            .padding(horizontal = 24.dp),
+            .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(16.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Image(
             painter = painterResource(icon),
