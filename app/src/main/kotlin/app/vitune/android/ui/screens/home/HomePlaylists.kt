@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -361,12 +362,11 @@ fun FluidInterlockingPlaylistPill(
         )
     }
 
-    // Dynamic gradient background that ensures visibility on Normal, AMOLED, and Pure Black modes
-    val gradientBrush = Brush.linearGradient(
+    // Glassy gradient interior fill
+    val backgroundBrush = Brush.verticalGradient(
         colors = listOf(
-            colorPalette.background1.copy(alpha = 0.95f),
-            colorPalette.accent.copy(alpha = 0.15f),
-            colorPalette.background2.copy(alpha = 0.8f)
+            colorPalette.background1.copy(alpha = 0.85f),
+            colorPalette.background0.copy(alpha = 0.95f)
         )
     )
 
@@ -375,7 +375,18 @@ fun FluidInterlockingPlaylistPill(
             .fillMaxWidth()
             .height(60.dp)
             .clip(shape)
-            .background(brush = gradientBrush)
+            .background(brush = backgroundBrush)
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        colorTint.copy(alpha = 0.8f),
+                        colorPalette.accent.copy(alpha = 0.3f),
+                        colorPalette.textDisabled.copy(alpha = 0.1f)
+                    )
+                ),
+                shape = shape
+            )
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -395,4 +406,3 @@ fun FluidInterlockingPlaylistPill(
         )
     }
 }
-
