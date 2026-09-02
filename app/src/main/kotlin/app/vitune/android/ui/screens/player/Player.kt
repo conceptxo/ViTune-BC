@@ -557,15 +557,20 @@ fun Player(
                 onTitleClick = {
                     mediaItem?.mediaMetadata?.let { metadata ->
                         metadata.extras?.getString("albumId")?.let { albumId ->
-                            albumRoute?.invoke(albumId)
+                            routeHandler.navigate {
+                                albumRoute(albumId)
+                            }
                         }
                     }
                 },
                 onArtistClick = {
                     mediaItem?.mediaMetadata?.extras?.getString("artistId")?.let { artistId ->
-                        artistRoute?.invoke(artistId)
+                        routeHandler.navigate {
+                            artistRoute(artistId)
+                        }
                     }
                 },
+                
                 
                 modifier = Modifier
                     .padding(vertical = 8.dp)
