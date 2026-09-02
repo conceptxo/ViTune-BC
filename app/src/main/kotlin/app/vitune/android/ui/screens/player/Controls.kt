@@ -398,10 +398,11 @@ private fun MediaInfo(media: UiMedia) {
             modifier = Modifier.fillMaxWidth()
         ) {
             BasicText(
-                text = media.artists.joinToString(", ") { it.name },
+                text = media.artists?.joinToString(", ") { artist -> artist.name } ?: "",
                 style = MaterialTheme.typography.bodyMedium.secondary.copy(color = colorPalette.textSecondary),
                 maxLines = 1
             )
         }
     }
 }
+
