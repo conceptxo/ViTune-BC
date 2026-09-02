@@ -5,14 +5,17 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -21,7 +24,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import app.vitune.android.Database
@@ -48,6 +50,8 @@ import app.vitune.core.data.enums.SortOrder
 import app.vitune.core.ui.LocalAppearance
 import app.vitune.providers.piped.Piped
 import app.vitune.providers.piped.models.Session
+import app.vitune.compose.persist.persist
+import app.vitune.compose.persist.persistList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.async
 import app.vitune.providers.piped.models.PlaylistPreview as PipedPlaylistPreview
@@ -87,7 +91,7 @@ fun HomePlaylists(
         Database.pipedSessions().collect { sessions ->
             pipedSessions = sessions.associateWith { session ->
                 async {
-                    Piped.playlist.list(session = session.toApiSession())?.getOrNull()
+                    Piped.playlist.list(session = session)?.getOrNull()
                 }
             }.mapValues { (_, value) -> value.await() }
         }
@@ -99,25 +103,27 @@ fun HomePlaylists(
         label = ""
     )
 
-    val lazyListState = rememberLazyListState()
+    val lazyGridState = rememberLazyGridState()
     val builtInPlaylists by BuiltInPlaylistScreen.shownPlaylistsAsState()
 
-    val showFloatingActionsContainer = lazyListState.firstVisibleItemIndex > 0 ||
-            lazyListState.firstVisibleItemScrollOffset > 0
+    val showFloatingActionsContainer = lazyGridState.firstVisibleItemIndex > 0 ||
+            lazyGridState.firstVisibleItemScrollOffset > 0
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(colorPalette.background0)
     ) {
-        LazyColumn(
-            state = lazyListState,
+        LazyVerticalGrid(
+            columns = GridCells.Fixed(2),
+            state = lazyGridState,
             contentPadding = LocalPlayerAwareWindowInsets.current
                 .only(WindowInsetsSides.Vertical + WindowInsetsSides.Horizontal)
                 .asPaddingValues(),
             modifier = Modifier.fillMaxSize()
         ) {
-            item(key = "header") {
+            // Header spans across both columns (full width)
+            item(key = "header", span = { GridItemSpan(2) }) {
                 Header(title = stringResource(R.string.playlists)) {
                     SecondaryTextButton(
                         text = stringResource(R.string.new_playlist),
@@ -145,23 +151,22 @@ fun HomePlaylists(
                 }
             }
 
+            // 2x2 Bento Grid section for built-in playlists (Favorites, Offline, Top 50, History)
             items(builtInPlaylists, key = { "builtin_${it.name}" }) { builtInPlaylist ->
                 PlaylistItem(
-                    icon = builtInPlaylist.icon,
-                    colorTint = colorPalette.accent,
-                    name = stringResource(builtInPlaylist.title),
-                    songCount = null,
-                    thumbnailSize = Dimensions.thumbnails.playlist,
+                    playlist = builtInPlaylist,
                     onClick = { onBuiltInPlaylist(builtInPlaylist) },
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                    shape = RoundedCornerShape(24.dp),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                 )
             }
 
-            items(items, key = { it.id }) { playlist ->
+            // Regular user playlists span full width underneath the 2x2 grid
+            items(items, key = { it.id }, span = { GridItemSpan(2) }) { playlist ->
                 PlaylistItem(
                     playlist = playlist,
-                    thumbnailSize = Dimensions.thumbnails.playlist,
-                    onClick = { onPlaylistClick(playlist.toPlaylist()) },
+                    onClick = { onPlaylistClick(playlist.playlist) },
+                    shape = RoundedCornerShape(24.dp),
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )
             }
@@ -169,18 +174,15 @@ fun HomePlaylists(
             for ((session, playlists) in pipedSessions) {
                 if (playlists == null) continue
 
-                item(key = "piped_${session.id}_header") {
+                item(key = "piped_${session.id}_header", span = { GridItemSpan(2) }) {
                     SettingsEntryGroupText(title = session.name)
                 }
 
-                items(playlists, key = { "piped_${session.id}_${it.id}" }) { playlist ->
+                items(playlists, key = { "piped_${session.id}_${it.id}" }, span = { GridItemSpan(2) }) { playlist ->
                     PlaylistItem(
-                        thumbnailUrl = playlist.thumbnailUrl,
-                        songCount = playlist.songCount,
-                        name = playlist.name,
-                        channelName = null,
-                        thumbnailSize = Dimensions.thumbnails.playlist,
-                        onClick = { onPipedPlaylistClick(session.toApiSession(), playlist) },
+                        playlist = playlist,
+                        onClick = { onPipedPlaylistClick(session, playlist) },
+                        shape = RoundedCornerShape(24.dp),
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                     )
                 }
@@ -188,8 +190,8 @@ fun HomePlaylists(
         }
 
         FloatingActionsContainerWithScrollToTop(
-            lazyListState = lazyListState,
-            show = showFloatingActionsContainer
+            lazyGridState = lazyGridState,
+            visible = showFloatingActionsContainer
         )
     }
 }
