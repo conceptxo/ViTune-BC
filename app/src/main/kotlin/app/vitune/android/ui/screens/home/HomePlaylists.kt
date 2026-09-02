@@ -1,8 +1,5 @@
 package app.vitune.android.ui.screens.home
 
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +13,6 @@ import androidx.compose.foundation.lazy.grid.GridItemSpan
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.grid.rememberLazyGridState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +43,7 @@ import app.vitune.android.ui.screens.settings.SettingsEntryGroupText
 import app.vitune.core.data.enums.BuiltInPlaylist
 import app.vitune.core.data.enums.PlaylistSortBy
 import app.vitune.core.data.enums.SortOrder
+import app.vitune.core.ui.Dimensions
 import app.vitune.core.ui.LocalAppearance
 import app.vitune.providers.piped.Piped
 import app.vitune.providers.piped.models.Session
@@ -91,17 +88,11 @@ fun HomePlaylists(
         Database.pipedSessions().collect { sessions ->
             pipedSessions = sessions.associateWith { session ->
                 async {
-                    Piped.playlist.list(session = session)?.getOrNull()
+                    Piped.playlist.list(session = session.toApiSession())?.getOrNull()
                 }
             }.mapValues { (_, value) -> value.await() }
         }
     }
-
-    val sortOrderIconRotation by animateFloatAsState(
-        targetValue = if (playlistSortOrder == SortOrder.Ascending) 0f else 180f,
-        animationSpec = tween(durationMillis = 400, easing = LinearEasing),
-        label = ""
-    )
 
     val lazyGridState = rememberLazyGridState()
     val builtInPlaylists by BuiltInPlaylistScreen.shownPlaylistsAsState()
@@ -122,7 +113,6 @@ fun HomePlaylists(
                 .asPaddingValues(),
             modifier = Modifier.fillMaxSize()
         ) {
-            // Header spans across both columns (full width)
             item(key = "header", span = { GridItemSpan(2) }) {
                 Header(title = stringResource(R.string.playlists)) {
                     SecondaryTextButton(
@@ -138,35 +128,31 @@ fun HomePlaylists(
                     )
 
                     HeaderIconButton(
-                        icon = R.drawable.swap_vert,
-                        color = if (playlistSortBy != PlaylistSortBy.DateAdded || playlistSortOrder != SortOrder.Descending) colorPalette.accent else colorPalette.text,
-                        rotation = sortOrderIconRotation,
-                        onClick = { playlistSortOrder = playlistSortOrder.next() }
-                    )
-
-                    HeaderIconButton(
                         icon = R.drawable.search,
                         onClick = onSearchClick
                     )
                 }
             }
 
-            // 2x2 Bento Grid section for built-in playlists (Favorites, Offline, Top 50, History)
+            // 2x2 Bento Grid Layout for Built-in Playlists
             items(builtInPlaylists, key = { "builtin_${it.name}" }) { builtInPlaylist ->
                 PlaylistItem(
-                    playlist = builtInPlaylist,
+                    icon = builtInPlaylist.icon,
+                    colorTint = colorPalette.accent,
+                    name = stringResource(builtInPlaylist.title),
+                    songCount = null,
+                    thumbnailSize = Dimensions.thumbnails.playlist,
                     onClick = { onBuiltInPlaylist(builtInPlaylist) },
-                    shape = RoundedCornerShape(24.dp),
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 6.dp)
                 )
             }
 
-            // Regular user playlists span full width underneath the 2x2 grid
+            // User Playlists spanning full width below
             items(items, key = { it.id }, span = { GridItemSpan(2) }) { playlist ->
                 PlaylistItem(
                     playlist = playlist,
-                    onClick = { onPlaylistClick(playlist.playlist) },
-                    shape = RoundedCornerShape(24.dp),
+                    thumbnailSize = Dimensions.thumbnails.playlist,
+                    onClick = { onPlaylistClick(playlist.toPlaylist()) },
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                 )
             }
@@ -180,9 +166,12 @@ fun HomePlaylists(
 
                 items(playlists, key = { "piped_${session.id}_${it.id}" }, span = { GridItemSpan(2) }) { playlist ->
                     PlaylistItem(
-                        playlist = playlist,
-                        onClick = { onPipedPlaylistClick(session, playlist) },
-                        shape = RoundedCornerShape(24.dp),
+                        thumbnailUrl = playlist.thumbnailUrl,
+                        songCount = playlist.songCount,
+                        name = playlist.name,
+                        channelName = null,
+                        thumbnailSize = Dimensions.thumbnails.playlist,
+                        onClick = { onPipedPlaylistClick(session.toApiSession(), playlist) },
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
                     )
                 }
