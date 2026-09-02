@@ -1,5 +1,6 @@
 package app.vitune.android.ui.screens.player
 
+import app.vitune.compose.routing.LocalRouteHandler
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -552,15 +553,20 @@ fun Player(
                 onTitleClick = {
                     mediaItem?.mediaMetadata?.let { metadata ->
                         metadata.extras?.getString("albumId")?.let { albumId ->
-                            albumRoute(albumId)
+                            with(routeHandler) {
+                                albumRoute(albumId)
+                            }
                         }
                     }
                 },
                 onArtistClick = {
                     mediaItem?.mediaMetadata?.extras?.getString("artistId")?.let { artistId ->
-                        artistRoute(artistId)
+                        with(routeHandler) {
+                            artistRoute(artistId)
+                        }
                     }
                 },
+                
                   
                 modifier = Modifier
                     .padding(vertical = 8.dp)
