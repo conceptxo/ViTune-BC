@@ -558,7 +558,7 @@ fun Player(
                     mediaItem?.mediaMetadata?.let { metadata ->
                         metadata.extras?.getString("albumId")?.let { albumId ->
                             with(routeHandler) {
-                                albumRoute(albumId)
+                                albumRoute?.invoke(albumId)
                             }
                         }
                     }
@@ -566,10 +566,11 @@ fun Player(
                 onArtistClick = {
                     mediaItem?.mediaMetadata?.extras?.getString("artistId")?.let { artistId ->
                         with(routeHandler) {
-                            artistRoute(artistId)
+                            artistRoute?.invoke(artistId)
                         }
                     }
                 },
+                
                 
                   
                 modifier = Modifier
