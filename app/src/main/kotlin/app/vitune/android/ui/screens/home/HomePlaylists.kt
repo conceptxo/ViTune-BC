@@ -362,11 +362,12 @@ fun FluidInterlockingPlaylistPill(
         )
     }
 
-    // Glassy gradient interior fill
-    val backgroundBrush = Brush.verticalGradient(
+    // Rich luminous color gradient fill inside the pill so text and background stand out clearly on AMOLED/Pure Black
+    val interiorGradient = Brush.verticalGradient(
         colors = listOf(
-            colorPalette.background1.copy(alpha = 0.85f),
-            colorPalette.background0.copy(alpha = 0.95f)
+            colorTint.copy(alpha = 0.28f),
+            colorPalette.background1.copy(alpha = 0.95f),
+            colorPalette.background0.copy(alpha = 0.98f)
         )
     )
 
@@ -375,14 +376,14 @@ fun FluidInterlockingPlaylistPill(
             .fillMaxWidth()
             .height(60.dp)
             .clip(shape)
-            .background(brush = backgroundBrush)
+            .background(brush = interiorGradient)
             .border(
                 width = 1.dp,
                 brush = Brush.linearGradient(
                     colors = listOf(
-                        colorTint.copy(alpha = 0.8f),
-                        colorPalette.accent.copy(alpha = 0.3f),
-                        colorPalette.textDisabled.copy(alpha = 0.1f)
+                        colorTint.copy(alpha = 0.9f),
+                        colorPalette.accent.copy(alpha = 0.4f),
+                        colorPalette.background0
                     )
                 ),
                 shape = shape
@@ -406,3 +407,4 @@ fun FluidInterlockingPlaylistPill(
         )
     }
 }
+
