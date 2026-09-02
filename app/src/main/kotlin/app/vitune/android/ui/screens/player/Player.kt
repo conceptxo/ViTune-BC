@@ -145,7 +145,7 @@ fun Player(
                 layoutState.collapseSoft()
             }
         }
-
+        
         var likedAt by remember(mediaItem) {
             mutableStateOf(
                 value = null,
@@ -196,4 +196,161 @@ fun Player(
             .asPaddingValues()
 
         OnGlobalRoute { if (layoutState.expanded) layoutState.collapseSoft() }
-        
+
+        var isShowingStatsForNerds by rememberSaveable { mutableStateOf(false) }
+        var isShowingLyricsDialog by rememberSaveable { mutableStateOf(false) }
+        var audioDialogOpen by rememberSaveable { mutableStateOf(false) }
+        var boostDialogOpen by rememberSaveable { mutableStateOf(false) }
+
+        if (mediaItem != null) {
+            Box(
+                modifier = modifier
+                    .fillMaxSize()
+                    .background(colorPalette.background0)
+            ) {
+                // 1. Full-bleed background artwork with heavy blur and blend scaling
+                AsyncImage(
+                    model = metadata?.artworkUri?.thumbnail(Dimensions.thumbnails.song.px),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .graphicsLayer {
+                            alpha = 0.5f
+                            scaleX = 1.3f
+                            scaleY = 1.3f
+                        }
+                        .blur(45.dp)
+                )
+
+                // 2. Multi-stop vertical gradient overlay to smoothly melt the image into the app theme
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.Black.copy(alpha = 0.2f),
+                                    colorPalette.background0.copy(alpha = 0.65f),
+                                    colorPalette.background0.copy(alpha = 0.95f),
+                                    colorPalette.background0
+                                )
+                            )
+                        )
+                )
+
+                // 3. Player Content UI Layer
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontalBottomPaddingValues)
+                        .padding(horizontal = 24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // Drag handle / Header bar
+                    Box(
+                        modifier = Modifier
+                            .width(36.dp)
+                            .height(4.dp)
+                            .clip(RoundedCornerShape(2.dp))
+                            .background(Color.White.copy(alpha = 0.4f))
+                    )
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Main focal artwork card with subtle border edge light
+                    AsyncImage(
+                        model = metadata?.artworkUri?.thumbnail(Dimensions.thumbnails.song.px),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(310.dp)
+                            .clip(RoundedCornerShape(28.dp))
+                            .border(
+                                width = 1.5.dp,
+                                color = Color.White.copy(alpha = 0.2f),
+                                shape = RoundedCornerShape(28.dp)
+                            )
+                    )
+
+                    Spacer(modifier = Modifier.height(36.dp))
+
+                    // Track Title & Artist Info matching the reference hierarchy
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.Start
+                    ) {
+                        BasicText(
+                            text = metadata?.title?.toString().orEmpty(),
+                            style = typography.titleLarge.semiBold().copy(color = colorPalette.text),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Spacer(modifier = Modifier.height(6.dp))
+                        BasicText(
+                            text = metadata?.artist?.toString().orEmpty(),
+                            style = typography.bodyMedium.secondary().copy(color = colorPalette.textSecondary),
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.weight(1f))
+
+                    // Playback controls row safely contained inside the main layout column
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            icon = R.drawable.heart,
+                            color = if (likedAt != null) colorPalette.accent else colorPalette.text,
+                            onClick = {
+                                likedAt = if (likedAt == null) System.currentTimeMillis() else null
+                            }
+                        )
+                        IconButton(
+                            icon = R.drawable.volume,
+                            onClick = { audioDialogOpen = true }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(24.dp))
+                }
+            }
+        }
+
+        if (audioDialogOpen) SliderDialog(
+            onDismiss = { audioDialogOpen = false },
+            title = stringResource(R.string.playback_settings)
+        ) {
+            SliderDialogBody(
+                provideState = { remember(speed) { mutableFloatStateOf(speed) } },
+                onSlideComplete = { speed = it },
+                min = 0f,
+                max = 2f,
+                toDisplay = {
+                    if (it <= 0.01f) stringResource(R.string.minimum_speed_value)
+                    else stringResource(R.string.format_multiplier, "%.2f".format(it))
+                },
+                steps = 39,
+                label = stringResource(R.string.playback_speed)
+            )
+            Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = Alignment.Center
+            ) {
+                SecondaryTextButton(
+                    text = stringResource(R.string.reset),
+                    onClick = {
+                        speed = 1f
+                        pitch = 1f
+                    }
+                )
+            }
+        }
+    }
+}
