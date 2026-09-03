@@ -221,24 +221,10 @@ fun Queue(
         state = layoutState,
         modifier = modifier.fillMaxSize(),
 collapsedContent = { innerModifier ->
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontalBottomPaddingValues),
-                contentAlignment = Alignment.Center
-            ) {
-                // Clean chevron-up button — replaces the old "Queue" pill.
-                // Tapping it expands the queue sheet (default BottomSheet behavior).
-                // Swipe-up gesture also works (BottomSheet handles it automatically).
-                Image(
-                    painter = painterResource(R.drawable.chevron_up),
-                    contentDescription = "Open Queue",
-                    colorFilter = ColorFilter.tint(colorPalette.text),
-                    modifier = Modifier
-                        .then(innerModifier)
-                        .size(28.dp)
-                )
-            }
+            // Empty collapsed content — the chevron-up arrow button now lives
+            // in BitChordPlayer.kt (between playback controls and the 4-icon row).
+            // Tapping it calls onExpandQueue which expands this BottomSheet.
+            Spacer(modifier = Modifier.then(innerModifier))
 }
     ) {
         val musicBarsTransition = updateTransition(
