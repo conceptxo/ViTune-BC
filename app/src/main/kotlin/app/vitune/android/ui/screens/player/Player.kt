@@ -560,7 +560,10 @@ fun Player(
                     // Artist click navigation disabled to stabilize builds
                 },
                 onOpenLyricsDialog = { isShowingLyricsDialog = true },
-                
+                onExpandQueue = {
+                    // Expand the player sheet to reveal the queue (BottomSheet content)
+                    playerBottomSheetState.expandSoft()
+                },
                  modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
