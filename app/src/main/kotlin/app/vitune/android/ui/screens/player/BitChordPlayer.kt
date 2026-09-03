@@ -445,14 +445,21 @@ fun BitChordPlayer(
                 .background(Color.White.copy(alpha = 0.4f))
         )
 
-        // 6. Main content column — bottom aligned, sits on top of blurred bg + scrim
+        // 6. Main content column — bottom aligned but with LARGE bottom padding
+        //    so all controls (including the chevron-up arrow) sit ABOVE the
+        //    Android system navigation bar / gesture area.
+        //
+        //    Bottom padding 72dp ensures:
+        //    - 4-icon row (Shuffle/Repeat/Loop/Menu) sits at ~78% screen height (SAFE ZONE)
+        //    - Chevron-up arrow sits at ~88% screen height (HANDLE ZONE)
+        //    - No overlap with Android home/back gesture area
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .padding(top = 40.dp, bottom = 32.dp)
+                .padding(top = 24.dp, bottom = 72.dp)
         ) {
             // ---- Title + Artist + Heart row ----
             Row(
