@@ -161,16 +161,15 @@ fun BitChordPlayer(
 
     // --- Extract colors from album art for the gradient background ---
     // BITCHORD-STYLE color transition:
-    // 1. On song change: IMMEDIATELY snap bgColors to LoadingColors (dark grey)
-    // 2. Once new palette is extracted: bgColors updates to the new colors
-    // 3. animateColorAsState (below) smoothly crossfades from old → new
-    //
-    // This gives the "snap to neutral, then fade to new color" effect
-    // exactly like BITCHORD. No blue flash, no jarring rainbow.
+    // DO NOT snap to loading colors (that causes a grey flash).
+    // Instead, KEEP the previous song's colors until the new palette is
+    // extracted. Then animateColorAsState crossfades DIRECTLY from
+    // old → new in ONE smooth 400ms step. No intermediate flash.
     var bgColors by remember { mutableStateOf(LoadingColors) }
     LaunchedEffect(mediaItem.mediaId) {
-        // Snap to neutral loading colors IMMEDIATELY on song change
-        bgColors = LoadingColors
+        // NOTE: Do NOT set bgColors = LoadingColors here!
+        // Keeping the previous colors until new ones are ready is what
+        // makes the transition smooth (old → new, no grey flash in between).
         val artworkUri = metadata.artworkUri?.toString()
         if (artworkUri != null) {
             withContext(Dispatchers.IO) {
@@ -200,17 +199,17 @@ fun BitChordPlayer(
         }
     }
 
-    // --- Smooth gradient color crossfade (400ms — matches BITCHORD's timing) ---
-    // When bgColors changes, the gradient smoothly crossfades over 400ms.
-    // This is the "fade to new color" phase after the snap to loading colors.
+    // --- Smooth gradient color crossfade (600ms for buttery flow) ---
+    // Crossfades DIRECTLY from old colors → new colors in ONE step.
+    // No grey flash, no two-step transition. Just a smooth morph.
     val animatedTopColor by animateColorAsState(
         targetValue = bgColors.getOrElse(0) { LoadingColors[0] },
-        animationSpec = tween(durationMillis = 400),
+        animationSpec = tween(durationMillis = 600),
         label = "gradientTop"
     )
     val animatedBottomColor by animateColorAsState(
         targetValue = bgColors.getOrElse(1) { LoadingColors[1] },
-        animationSpec = tween(durationMillis = 400),
+        animationSpec = tween(durationMillis = 600),
         label = "gradientBottom"
     )
 
