@@ -666,27 +666,16 @@ fun Player(
                 ) else Spacer(modifier = Modifier.width(20.dp))
             },
             afterContent = {
+                // Clean chevron-up button — replaces the old "more options" icon.
+                // Tapping it dismisses the now-playing sheet (back to mini player),
+                // matching the user's reference app.
                 IconButton(
-                    icon = R.drawable.ellipsis_horizontal,
+                    icon = R.drawable.chevron_up,
                     color = colorPalette.text,
-                    onClick = {
-                        mediaItem?.let {
-                            menuState.display {
-                                PlayerMenu(
-                                    onDismiss = menuState::hide,
-                                    mediaItem = it,
-                                    binder = binder,
-                                    onShowSpeedDialog = { audioDialogOpen = true },
-                                    onShowNormalizationDialog = {
-                                        boostDialogOpen = true
-                                    }.takeIf { volumeNormalization }
-                                )
-                            }
-                        }
-                    },
+                    onClick = { playerBottomSheetState.collapseSoft() },
                     modifier = Modifier
                         .padding(vertical = 8.dp)
-                        .size(20.dp)
+                        .size(24.dp)
                 )
             },
             modifier = Modifier.align(Alignment.BottomCenter),
