@@ -113,6 +113,7 @@ fun BitChordPlayer(
     onOpenQueue: () -> Unit,
     onTitleClick: (() -> Unit)? = null,
     onArtistClick: (() -> Unit)? = null,
+    onOpenLyricsDialog: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val (colorPalette, typography) = LocalAppearance.current
@@ -285,7 +286,7 @@ fun BitChordPlayer(
     }
     val currentLyricLine = currentSentenceRaw?.takeIf { it.isNotBlank() }
     val isInstrumentalGap = currentSentenceRaw != null && currentSentenceRaw.isBlank()
-
+    
     var searchPhraseIndex by remember(mediaItem.mediaId) { mutableIntStateOf(0) }
     LaunchedEffect(mediaItem.mediaId, isFetchingLyrics) {
         if (!isFetchingLyrics) return@LaunchedEffect
@@ -330,12 +331,13 @@ fun BitChordPlayer(
                 }
         )
 
-        // 2. CRISP TOP IMAGE — top 55% of screen, fades out at its bottom edge
-        //    into the blurred background below — seamless blend.
+        // 2. CRISP TOP IMAGE — top 60% of screen, fades out smoothly into the
+        //    blurred background below. Fade is spread over a wide range (50%->80%
+        //    of image height) so there is NO hard seam.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.55f)
+                .fillMaxHeight(0.60f)
                 .align(Alignment.TopCenter)
         ) {
             AsyncImage(
@@ -346,11 +348,15 @@ fun BitChordPlayer(
                     .fillMaxSize()
                     .drawWithContent {
                         drawContent()
+                        // Long, gentle alpha mask: keep full opacity until 50% of
+                        // image height, then fade gradually to transparent at 100%.
+                        // This 50% wide fade range is what makes the blend seamless.
                         drawRect(
                             brush = Brush.verticalGradient(
                                 colorStops = arrayOf(
-                                    0.75f to Color.Black,
-                                    1.0f to Color.Transparent
+                                    0.00f to Color.Black,
+                                    0.50f to Color.Black,
+                                    1.00f to Color.Transparent
                                 )
                             ),
                             blendMode = BlendMode.DstIn
@@ -359,23 +365,29 @@ fun BitChordPlayer(
             )
         }
 
-        // 3. DARK SCRIM on the bottom half — for text legibility on the blurred bg
+        // 3. DARK SCRIM (multi-stop, very gentle) — for text legibility on the
+        //    blurred bg. Starts nearly transparent at 30%, reaches full 75% black
+        //    at the very bottom. Distributes darkening across the whole height
+        //    so no hard transition line is visible.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
-                            0.40f to Color.Transparent,
-                            0.55f to Color.Black.copy(alpha = 0.25f),
-                            0.75f to Color.Black.copy(alpha = 0.55f),
-                            1.00f to Color.Black.copy(alpha = 0.75f)
+                            0.00f to Color.Black.copy(alpha = 0.10f),
+                            0.30f to Color.Black.copy(alpha = 0.15f),
+                            0.50f to Color.Black.copy(alpha = 0.35f),
+                            0.70f to Color.Black.copy(alpha = 0.55f),
+                            1.00f to Color.Black.copy(alpha = 0.80f)
                         )
                     )
                 )
         )
 
         // 4. Full lyrics overlay (when user taps the lyric strip)
+        //    onOpenDialog is now wired to onOpenLyricsDialog so the expand icon
+        //    (top-left of lyrics overlay) opens the LrcLib search dialog.
         Lyrics(
             mediaId = mediaItem.mediaId,
             isDisplayed = isShowingLyrics,
@@ -383,7 +395,7 @@ fun BitChordPlayer(
             ensureSongInserted = { Database.insert(mediaItem) },
             mediaMetadataProvider = { mediaItem.mediaMetadata },
             durationProvider = { binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET },
-            onOpenDialog = {},
+            onOpenDialog = onOpenLyricsDialog,
             modifier = Modifier.fillMaxSize(),
             shouldShowSynchronizedLyrics = PlayerPreferences.isShowingSynchronizedLyrics,
             setShouldShowSynchronizedLyrics = { PlayerPreferences.isShowingSynchronizedLyrics = it },
@@ -590,114 +602,7 @@ fun BitChordPlayer(
                     )
                 }
             }
-
-            Spacer(modifier = Modifier.height(24.dp))
-
-            // ---- Secondary row: Shuffle / Repeat / Loop / Queue (all as icons) ----
-            Row(
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                // Shuffle
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(
-                            if (shuffleOn) Color.White.copy(alpha = 0.2f) else Color.Transparent
-                        )
-                        .clickable {
-                            shuffleOn = !shuffleOn
-                            binder.player.shuffleModeEnabled = shuffleOn
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = BitChordIcons.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = if (shuffleOn) Color.White
-                               else Color.White.copy(alpha = 0.4f),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Repeat
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(
-                            if (repeatMode != Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.2f)
-                            else Color.Transparent
-                        )
-                        .clickable {
-                            repeatMode = when (repeatMode) {
-                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-                                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-                                else -> Player.REPEAT_MODE_OFF
-                            }
-                            binder.player.repeatMode = repeatMode
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (repeatMode == Player.REPEAT_MODE_ONE) BitChordIcons.RepeatOne
-                                       else BitChordIcons.Repeat,
-                        contentDescription = "Repeat",
-                        tint = if (repeatMode != Player.REPEAT_MODE_OFF) Color.White
-                               else Color.White.copy(alpha = 0.4f),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Infinity loop
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(
-                            if (PlayerPreferences.trackLoopEnabled) Color.White.copy(alpha = 0.2f)
-                            else Color.Transparent
-                        )
-                        .clickable {
-                            PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = BitChordIcons.Infinity,
-                        contentDescription = "Loop",
-                        tint = if (PlayerPreferences.trackLoopEnabled) Color.White
-                               else Color.White.copy(alpha = 0.4f),
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-
-                // Queue
-                Box(
-                    modifier = Modifier
-                        .size(44.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.Transparent)
-                        .clickable { onOpenQueue() },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = BitChordIcons.Queue,
-                        contentDescription = "Queue",
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-    }
-}
-
-/** Format milliseconds as "M:SS" (e.g. 1:09). */
+            /** Format milliseconds as "M:SS" (e.g. 1:09). */
 private fun formatTime(ms: Long): String {
     if (ms <= 0) return "0:00"
     val totalSeconds = ms / 1000
