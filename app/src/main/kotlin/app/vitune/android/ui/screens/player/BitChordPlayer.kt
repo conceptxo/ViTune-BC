@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -33,7 +34,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
@@ -57,7 +59,6 @@ import app.vitune.android.utils.SynchronizedLyrics
 import app.vitune.android.utils.SynchronizedLyricsState
 import app.vitune.android.utils.forceSeekToNext
 import app.vitune.android.utils.forceSeekToPrevious
-import app.vitune.android.utils.secondary
 import app.vitune.android.utils.semiBold
 import app.vitune.android.utils.thumbnail
 import app.vitune.core.ui.Dimensions
@@ -84,6 +85,7 @@ import kotlinx.coroutines.flow.cancellable
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
+
 private const val INLINE_LYRIC_UPDATE_DELAY = 50L
 private const val LYRIC_SEARCH_PHRASE_INTERVAL_MS = 1800L
 
@@ -110,13 +112,13 @@ fun BitChordPlayer(
     onArtistClick: (() -> Unit)? = null,
     modifier: Modifier = Modifier
 ) {
-    
     val (colorPalette, typography) = LocalAppearance.current
     val metadata = mediaItem.mediaMetadata
     val media = remember(mediaItem, duration) { mediaItem.toUiMedia(duration) }
 
+    // Subtle scale pulse on the background album art when play/pause toggles
     val artScale by animateFloatAsState(
-        targetValue = if (shouldBePlaying) 1f else 0.92f,
+        targetValue = if (shouldBePlaying) 1f else 0.96f,
         animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
         label = "artScale"
     )
@@ -156,10 +158,6 @@ fun BitChordPlayer(
                         val strippedTitle = title.split("(")[0].trim()
 
                         coroutineScope {
-                            // Duration is only needed by the LrcLib/KuGou calls,
-                            // not by Innertube â€” so it's fetched once, in
-                            // parallel, instead of blocking every provider
-                            // (including Innertube) behind it up front.
                             val durationDeferred = async {
                                 var d = withContext(Dispatchers.Main) {
                                     binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET
@@ -250,6 +248,7 @@ fun BitChordPlayer(
             isFetchingLyrics = false
         }
     }
+
     val lyricsState = remember(storedLyrics) {
         val file = storedLyrics?.synced?.takeIf { it.isNotBlank() }?.let {
             LrcParser.parse(it)?.toLrcFile()
@@ -278,9 +277,6 @@ fun BitChordPlayer(
         }
     }
 
-    // Raw current sentence, not filtered â€” distinguishes "no lyric line
-    // here" (blank, an instrumental gap the source explicitly marked) from
-    // "nothing has loaded at all" (null, no line exists at this index yet).
     val currentSentenceRaw = synchronizedLyrics?.let {
         it.sentences.values.toImmutableList().getOrNull(it.index)
     }
@@ -306,228 +302,308 @@ fun BitChordPlayer(
     }
     // --- end inline synced lyric line ---
 
-    Column(
-        horizontalAlignment = Alignment.CenterHorizontally,
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 28.dp)
-    ) {
-        Box(
+    // ====================================================================
+    //  NEW BITCHORD-STYLE UI
+    //  - Full-bleed album art as background
+    //  - Vertical dark gradient overlay for legibility
+    //  - Bottom-aligned content column
+    //  - White text/icons overlaid on dim art
+    // ====================================================================
+    Box(modifier = modifier.fillMaxSize()) {
+        // 1. Full-bleed album art background (subtle scale pulse on play/pause)
+        AsyncImage(
+            model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
             modifier = Modifier
-                .fillMaxWidth()
-                .aspectRatio(1f)
+                .fillMaxSize()
                 .graphicsLayer {
                     scaleX = artScale
                     scaleY = artScale
                 }
-                .shadow(14.dp, RoundedCornerShape(14.dp))
-                .clip(RoundedCornerShape(14.dp))
-                .background(colorPalette.background2)
-        ) {
-            AsyncImage(
-                model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f)
-            )
-
-            Lyrics(
-                mediaId = mediaItem.mediaId,
-                isDisplayed = isShowingLyrics,
-                onDismiss = { onShowLyrics(false) },
-                ensureSongInserted = { Database.insert(mediaItem) },
-                mediaMetadataProvider = { mediaItem.mediaMetadata },
-                durationProvider = { binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET },
-                onOpenDialog = {},
-                modifier = Modifier.fillMaxWidth().aspectRatio(1f),
-                shouldShowSynchronizedLyrics = PlayerPreferences.isShowingSynchronizedLyrics,
-                setShouldShowSynchronizedLyrics = { PlayerPreferences.isShowingSynchronizedLyrics = it },
-                showControls = true
-            )
-        }
-
-        Spacer(modifier = Modifier.height(20.dp))
-
-        Row(
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Top,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                BasicText(
-                    text = metadata.title?.toString().orEmpty(),
-                    style = typography.l.semiBold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.let { if (onTitleClick != null) it.clickable(onClick = onTitleClick) else it }
-                )
-                BasicText(
-                    text = metadata.artist?.toString().orEmpty(),
-                    style = typography.s.semiBold.secondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.let { if (onArtistClick != null) it.clickable(onClick = onArtistClick) else it }
-                )
-            }
-            
-
-            IconButton(
-                icon = if (likedAt == null) R.drawable.heart_outline else R.drawable.heart,
-                color = colorPalette.favoritesIcon,
-                onClick = {
-                    setLikedAt(if (likedAt == null) System.currentTimeMillis() else null)
-                },
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { onShowLyrics(true) }
-                .padding(vertical = 10.dp)
-        ) {
-            if (showNoteGlyph) {
-                Image(
-                    painter = painterResource(R.drawable.musical_notes),
-                    contentDescription = null,
-                    colorFilter = ColorFilter.tint(colorPalette.text.copy(alpha = 0.6f)),
-                    modifier = Modifier.size(12.dp)
-                )
-                Spacer(modifier = Modifier.width(6.dp))
-            }
-            AnimatedContent(
-                targetState = lyricStripText,
-                transitionSpec = { fadeIn() togetherWith fadeOut() },
-                label = "inlineLyricLine",
-                modifier = Modifier.weight(1f, fill = false)
-            ) { line ->
-                BasicText(
-                    text = line,
-                    style = typography.xs.semiBold.secondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            Spacer(modifier = Modifier.width(4.dp))
-            BasicText(
-                text = "\u203A",
-                style = typography.xs.semiBold.secondary
-            )
-        }
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        SeekBar(
-            binder = binder,
-            position = position,
-            media = media,
-            alwaysShowDuration = true,
-            style = PlayerPreferences.SeekBarStyle.Static
         )
 
-        Spacer(modifier = Modifier.height(20.dp))
+        // 2. Dark gradient overlay (top: 50% black, bottom: 85% black)
+        //    Makes white text legible on any album art.
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Black.copy(alpha = 0.5f),
+                            Color.Black.copy(alpha = 0.85f)
+                        )
+                    )
+                )
+        )
 
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(40.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // 3. Full lyrics overlay (when user taps the lyric strip)
+        Lyrics(
+            mediaId = mediaItem.mediaId,
+            isDisplayed = isShowingLyrics,
+            onDismiss = { onShowLyrics(false) },
+            ensureSongInserted = { Database.insert(mediaItem) },
+            mediaMetadataProvider = { mediaItem.mediaMetadata },
+            durationProvider = { binder.player.duration.takeIf { it > 0 } ?: C.TIME_UNSET },
+            onOpenDialog = {},
+            modifier = Modifier.fillMaxSize(),
+            shouldShowSynchronizedLyrics = PlayerPreferences.isShowingSynchronizedLyrics,
+            setShouldShowSynchronizedLyrics = { PlayerPreferences.isShowingSynchronizedLyrics = it },
+            showControls = true
+        )
+
+        // 4. Top drag-handle pill (like a bottom-sheet grabber)
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 12.dp)
+                .width(40.dp)
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color.White.copy(alpha = 0.4f))
+        )
+
+        // 5. Main content column — bottom aligned
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Bottom,
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 24.dp)
+                .padding(top = 40.dp, bottom = 32.dp)
         ) {
-            IconButton(
-                icon = R.drawable.play_skip_back,
-                color = colorPalette.text,
-                onClick = { binder.player.forceSeekToPrevious() },
-                modifier = Modifier.size(28.dp)
-            )
-
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .clickable {
-                        if (shouldBePlaying) binder.player.pause() else {
-                            if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
-                            binder.player.play()
-                        }
-                    }
-                    .background(colorPalette.background2)
-                    .size(64.dp)
+            // ---- Title + Artist + Heart row ----
+            Row(
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
             ) {
-                AnimatedPlayPauseButton(
-                    playing = shouldBePlaying,
+                Column(modifier = Modifier.weight(1f)) {
+                    BasicText(
+                        text = metadata.title?.toString().orEmpty(),
+                        style = typography.l.semiBold.copy(color = Color.White),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.let {
+                            if (onTitleClick != null) it.clickable(onClick = onTitleClick) else it
+                        }
+                    )
+                    BasicText(
+                        text = metadata.artist?.toString().orEmpty(),
+                        style = typography.s.semiBold.copy(color = Color.White.copy(alpha = 0.7f)),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.let {
+                            if (onArtistClick != null) it.clickable(onClick = onArtistClick) else it
+                        }
+                    )
+                }
+
+                // Heart inside a 40dp translucent circle (BITCHORD-style)
+                Box(
                     modifier = Modifier
-                        .align(Alignment.Center)
-                        .size(32.dp)
-                )
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .clickable {
+                            setLikedAt(if (likedAt == null) System.currentTimeMillis() else null)
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(
+                            if (likedAt == null) R.drawable.heart_outline else R.drawable.heart
+                        ),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(
+                            if (likedAt != null) colorPalette.favoritesIcon else Color.White
+                        ),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
             }
 
-            IconButton(
-                icon = R.drawable.play_skip_forward,
-                color = colorPalette.text,
-                onClick = { binder.player.forceSeekToNext() },
-                modifier = Modifier.size(28.dp)
-            )
-        }
+            Spacer(modifier = Modifier.height(16.dp))
 
-        Spacer(modifier = Modifier.height(24.dp))
-
-        Row(
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 8.dp)
-        ) {
-            Box(
+            // ---- Inline lyric strip (white 70% alpha) ----
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
-                    .clickable {
-                        shuffleOn = !shuffleOn
-                        binder.player.shuffleModeEnabled = shuffleOn
-                    }
-                    .padding(horizontal = 8.dp)
+                    .fillMaxWidth()
+                    .clickable { onShowLyrics(true) }
+                    .padding(vertical = 10.dp)
             ) {
+                if (showNoteGlyph) {
+                    Image(
+                        painter = painterResource(R.drawable.musical_notes),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.6f)),
+                        modifier = Modifier.size(12.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                }
+                AnimatedContent(
+                    targetState = lyricStripText,
+                    transitionSpec = { fadeIn() togetherWith fadeOut() },
+                    label = "inlineLyricLine",
+                    modifier = Modifier.weight(1f, fill = false)
+                ) { line ->
+                    BasicText(
+                        text = line,
+                        style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.7f)),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(modifier = Modifier.width(4.dp))
                 BasicText(
-                    text = "Shuffle",
-                    style = typography.xs.semiBold.let {
-                        if (shuffleOn) it.copy(color = colorPalette.accent) else it.secondary
-                    }
+                    text = "\u203A",
+                    style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.7f))
                 )
             }
 
-            Box(
-                modifier = Modifier
-                    .clickable {
-                        repeatMode = when (repeatMode) {
-                            Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
-                            Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
-                            else -> Player.REPEAT_MODE_OFF
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ---- SeekBar (unchanged) ----
+            SeekBar(
+                binder = binder,
+                position = position,
+                media = media,
+                alwaysShowDuration = true,
+                style = PlayerPreferences.SeekBarStyle.Static
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ---- Main controls: prev / play-pause / next ----
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                IconButton(
+                    icon = R.drawable.play_skip_back,
+                    color = Color.White,
+                    onClick = { binder.player.forceSeekToPrevious() },
+                    modifier = Modifier.size(36.dp)
+                )
+
+                // Play/Pause — just the icon, no filled circle background (BITCHORD style)
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clickable {
+                            if (shouldBePlaying) binder.player.pause() else {
+                                if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
+                                binder.player.play()
+                            }
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    AnimatedPlayPauseButton(
+                        playing = shouldBePlaying,
+                        modifier = Modifier.size(48.dp)
+                    )
+                }
+
+                IconButton(
+                    icon = R.drawable.play_skip_forward,
+                    color = Color.White,
+                    onClick = { binder.player.forceSeekToNext() },
+                    modifier = Modifier.size(36.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ---- Secondary row: Shuffle / Repeat / Loop / Queue ----
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Shuffle (text, white when active)
+                Box(
+                    modifier = Modifier
+                        .clickable {
+                            shuffleOn = !shuffleOn
+                            binder.player.shuffleModeEnabled = shuffleOn
                         }
-                        binder.player.repeatMode = repeatMode
-                    }
-                    .padding(horizontal = 8.dp)
-            ) {
-                BasicText(
-                    text = if (repeatMode == Player.REPEAT_MODE_ONE) "Repeat 1" else "Repeat",
-                    style = typography.xs.semiBold.let {
-                        if (repeatMode != Player.REPEAT_MODE_OFF) it.copy(color = colorPalette.accent) else it.secondary
-                    }
+                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                ) {
+                    BasicText(
+                        text = "Shuffle",
+                        style = typography.xs.semiBold.copy(
+                            color = if (shuffleOn) Color.White
+                                    else Color.White.copy(alpha = 0.4f)
+                        )
+                    )
+                }
+
+                // Repeat — "1" inside circle when Repeat One, "↻" otherwise
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (repeatMode != Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.2f)
+                            else Color.Transparent
+                        )
+                        .clickable {
+                            repeatMode = when (repeatMode) {
+                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                                else -> Player.REPEAT_MODE_OFF
+                            }
+                            binder.player.repeatMode = repeatMode
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    BasicText(
+                        text = if (repeatMode == Player.REPEAT_MODE_ONE) "1" else "\u21BB",
+                        style = typography.s.semiBold.copy(
+                            color = if (repeatMode != Player.REPEAT_MODE_OFF) Color.White
+                                    else Color.White.copy(alpha = 0.4f)
+                        )
+                    )
+                }
+
+                // Infinity loop inside circle
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (PlayerPreferences.trackLoopEnabled) Color.White.copy(alpha = 0.2f)
+                            else Color.Transparent
+                        )
+                        .clickable {
+                            PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.infinite),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(
+                            if (PlayerPreferences.trackLoopEnabled) Color.White
+                            else Color.White.copy(alpha = 0.4f)
+                        ),
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                // Queue (ellipsis icon)
+                IconButton(
+                    icon = R.drawable.ellipsis_horizontal,
+                    color = Color.White,
+                    onClick = onOpenQueue,
+                    modifier = Modifier.size(28.dp)
                 )
             }
 
-            IconButton(
-                icon = R.drawable.infinite,
-                enabled = PlayerPreferences.trackLoopEnabled,
-                onClick = { PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled },
-                modifier = Modifier.size(28.dp)
-            )
-
-            IconButton(
-                icon = R.drawable.ellipsis_horizontal,
-                color = colorPalette.text,
-                onClick = onOpenQueue,
-                modifier = Modifier.size(28.dp)
-            )
+            Spacer(modifier = Modifier.height(8.dp))
         }
-
-        Spacer(modifier = Modifier.height(8.dp))
     }
 }
