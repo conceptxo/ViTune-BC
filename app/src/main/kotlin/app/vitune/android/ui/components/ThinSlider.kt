@@ -52,13 +52,13 @@ fun ThinSlider(
     inactiveColor: Color = Color.White.copy(alpha = 0.26f),
 ) {
     var dragging by remember { mutableStateOf(false) }
-    // BUTTERY SMOOTH spring: low damping ratio (no bounce), medium-low stiffness
-    // so the height transition is gentle, not jumpy.
+    // BUTTERY SMOOTH spring: no bounce, very low stiffness for the gentlest
+    // possible height transition. The lower the stiffness, the smoother it feels.
     val height by animateDpAsState(
         targetValue = if (dragging) activeHeight else idleHeight,
         animationSpec = spring(
-            dampingRatio = Spring.DampingRatioNoBouncy,  // ← No bounce = smoother
-            stiffness = Spring.StiffnessLow,             // ← Slower, gentler transition
+            dampingRatio = Spring.DampingRatioNoBouncy,  // ← No bounce
+            stiffness = Spring.StiffnessVeryLow,          // ← Very gentle, slow transition
         ),
         label = "sliderHeight",
     )
