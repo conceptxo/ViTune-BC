@@ -353,20 +353,18 @@ fun BitChordPlayer(
                 .blur(48.dp)
         )
 
-        // 2. CRISP ALBUM ART — horizontal rectangle, ContentScale.Fit (NO CROPPING)
-        //    Size: full width × 420dp height (bigger, fills more screen)
-        //    Position: top-center, 16dp from the top
-        //    BOTTOM EDGE FADE: Only the very bottom 20% of the image fades
-        //    to transparent. This is a SOFT alpha mask (NOT a black gradient) —
-        //    the image's own colors are preserved, the bottom just becomes
-        //    gradually see-through so it blends into the blurred bg below.
-        //    NO black band, NO dark overlay on the cover itself.
+        // 2. CRISP ALBUM ART — SQUARE (centered, with blurred bg visible around it)
+        //    Size: 320dp × 320dp (about 85% of typical phone screen width)
+        //    Position: top-center, 24dp from the top
+        //    Aspect ratio 1:1 (square) — matches classic music player look.
+        //    The blurred background is visible AROUND the square art.
+        //    Bottom edge fades softly to transparent so it blends with blur.
+        //    NO black gradient on the art — colors stay original.
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 16.dp)
-                .fillMaxWidth()
-                .height(420.dp)
+                .padding(top = 24.dp)
+                .size(320.dp)
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -374,19 +372,15 @@ fun BitChordPlayer(
                     .crossfade(400)
                     .build(),
                 contentDescription = null,
-                contentScale = ContentScale.Fit,  // ← Fit = NO CROPPING, people stay visible
+                contentScale = ContentScale.Crop,  // ← Crop = fills the square (centered crop)
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(20.dp))
                     .drawWithContent {
                         drawContent()
                         // Soft alpha mask: full opacity until 85% of image height,
                         // then fade gradually to transparent at 100%.
-                        // Only the very bottom 15% fades — the rest of the cover
-                        // shows in its original colors. NO black band.
-                        // (This is the technique the RiMusic guy described:
-                        //  Brush.verticalGradient with BlendMode.DstIn, applied
-                        //  only at the bottom part of the box.)
+                        // Only the very bottom 15% fades — colors stay intact.
                         drawRect(
                             brush = Brush.verticalGradient(
                                 colorStops = arrayOf(
@@ -402,10 +396,10 @@ fun BitChordPlayer(
         }
 
         // 3. MULTI-STOP DARK GRADIENT (text legibility on blurred bg)
-        //    IMPORTANT: This gradient starts at 55% screen height (NOT 45%),
-        //    so it does NOT overlap the album art. The album art (420dp tall)
-        //    ends around 55% screen height, and the dark scrim only kicks in
-        //    AFTER that — keeping the cover's colors intact.
+        //    IMPORTANT: This gradient starts at 50% screen height so it does
+        //    NOT overlap the square album art (which ends around 40% screen
+        //    height). This keeps the cover's colors intact while ensuring
+        //    white text is readable on the blurred bg in the lower half.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -413,10 +407,10 @@ fun BitChordPlayer(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
                             0.00f to Color.Black.copy(alpha = 0.00f),
-                            0.50f to Color.Black.copy(alpha = 0.00f),
-                            0.55f to Color.Black.copy(alpha = 0.10f),
-                            0.65f to Color.Black.copy(alpha = 0.40f),
-                            0.80f to Color.Black.copy(alpha = 0.75f),
+                            0.45f to Color.Black.copy(alpha = 0.00f),
+                            0.50f to Color.Black.copy(alpha = 0.10f),
+                            0.65f to Color.Black.copy(alpha = 0.45f),
+                            0.80f to Color.Black.copy(alpha = 0.80f),
                             1.00f to Color.Black.copy(alpha = 0.97f)
                         )
                     )
