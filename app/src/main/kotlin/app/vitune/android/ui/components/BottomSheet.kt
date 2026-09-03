@@ -60,7 +60,12 @@ fun BottomSheet(
 ) = Box(
     modifier = modifier
         .offset(y = (state.expandedBound - state.value).coerceAtLeast(0.dp))
-        .pointerInput(state) {
+        // Only enable the drag gesture pointerInput when the sheet is actually
+        // visible (not in dismissed/collapsed state). This prevents an invisible
+        // collapsed Queue sheet from intercepting taps on the BitChordPlayer's
+        // buttons below it.
+        .pointerInput(state, state.value) {
+            if (state.value <= state.collapsedBound) return@pointerInput
             val velocityTracker = VelocityTracker()
 
             detectVerticalDragGestures(
