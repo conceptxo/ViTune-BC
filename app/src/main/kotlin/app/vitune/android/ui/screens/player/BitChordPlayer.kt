@@ -315,7 +315,7 @@ fun BitChordPlayer(
     // ====================================================================
     //  APPLE-MUSIC-STYLE NOW PLAYING
     // ====================================================================
-    Box(modifier = modifier.fillMaxSize()) {
+    Box(modifier = Modifier.fillMaxSize()) {
         // 1. BLURRED BACKGROUND — full screen, blurred album art
         AsyncImage(
             model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
