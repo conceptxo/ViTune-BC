@@ -123,10 +123,9 @@ fun BitChordPlayer(
     val metadata = mediaItem.mediaMetadata
     val media = remember(mediaItem, duration) { mediaItem.toUiMedia(duration) }
 
-    // NOTE: Removed the scale pulse on play/pause — it was causing the blurred
-    // background to visibly shrink/expand, which looked jarring. The album art
-    // now stays perfectly still whether playing or paused, which matches
-    // BITCHORD's behavior (where the album art is a static backdrop).
+    // NOTE: Removed the artScale animation — it was causing the background
+    // to visibly shrink/expand on play/pause, which looked jarring.
+    // The album art now stays perfectly still (matches BITCHORD/YumaPlayer).
 
     var shuffleOn by remember { mutableStateOf(binder.player.shuffleModeEnabled) }
     var repeatMode by remember { mutableStateOf(binder.player.repeatMode) }
@@ -315,31 +314,26 @@ fun BitChordPlayer(
                       else 0f
 
     // ====================================================================
-    //  APPLE-MUSIC-STYLE NOW PLAYING (YumaPlayer-style seamless blend)
+    //  HYBRID BACKGROUND (Apple Music / YumaPlayer style)
     //
-    //  THE BIG INSIGHT: We do NOT use two separate images (crisp + blurred).
-    //  Two stacked images ALWAYS produce a visible seam, no matter how wide
-    //  the alpha mask is, because the blur radius abruptly changes at the
-    //  boundary.
+    //  Layer 1: BLURRED FULL-SCREEN album art (background)
+    //           - Fills entire screen edge-to-edge
+    //           - 48dp blur radius → frosted glass effect
+    //           - Even low-res art looks smooth because it's blurred
+    //           - crossfade(400ms) for smooth song transitions
     //
-    //  Instead, we use ONE single full-screen image, and overlay a multi-stop
-    //  dark gradient on top of it. The gradient darkens the bottom 60% of the
-    //  screen heavily (so text is readable), while the top 40% stays nearly
-    //  transparent (so the crisp art shows through).
+    //  Layer 2: CRISP album art at NORMAL SIZE (horizontal rectangle)
+    //           - NOT stretched to fill screen → no pixelation
+    //           - Uses ContentScale.Fit → preserves aspect ratio, NO CROPPING
+    //             (people/faces stay visible!)
+    //           - Bottom edge FADES TO TRANSPARENT → seamless blend with blur
+    //           - Empty space around the art is filled by the blurred bg
     //
-    //  Result: NO seam, NO blur transition, NO two-image misalignment.
-    //  The crisp album art bleeds smoothly into a darkened version of itself,
-    //  exactly like YumaPlayer and Apple Music do it.
-    // ====================================================================
+    //  Layer 3: MULTI-STOP DARK GRADIENT over the bottom half
+    //           - Text legibility on top of the blurred bg
+    //  ====================================================================
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. SINGLE FULL-SCREEN ALBUM ART — crisp, no blur, no scaling.
-        //    Uses Coil's ImageRequest.Builder with crossfade(400ms) so that
-        //    when the song changes, the old album art fades smoothly into the
-        //    new one — NO jarring cut, NO black flash, NO "previous background
-        //    showing through" during transition.
-        //
-        //    We also pass an `ImageRequest` instead of a plain Uri so Coil
-        //    includes crossfade + a higher-priority load.
+        // 1. BLURRED FULL-SCREEN BACKGROUND
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
                 .data(metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px))
@@ -347,18 +341,53 @@ fun BitChordPlayer(
                 .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(48.dp)
         )
 
-        // 2. MULTI-STOP DARK GRADIENT — the magic layer.
-        //    Top 35%: nearly transparent (crisp art visible).
-        //    35% → 60%: gradual darkening (art still visible but dimmer).
-        //    60% → 100%: heavily darkened (controls readable on top).
-        //
-        //    The darkening IS the "blend" — by gradually covering the album
-        //    art with black, we create a smooth visual fade from "crisp art"
-        //    at top to "dark backdrop" at bottom. No seam possible because
-        //    there's only one image underneath.
+        // 2. CRISP ALBUM ART — horizontal rectangle, ContentScale.Fit (NO CROPPING)
+        //    Size: full width × 240dp height
+        //    Position: top-center, 32dp from the top
+        //    Bottom edge fades from opaque to transparent over the bottom 40%
+        //    of its height → seamless blend with the blurred background below.
+        Box(
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 32.dp)
+                .fillMaxWidth()
+                .height(240.dp)
+        ) {
+            AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px))
+                    .crossfade(400)
+                    .build(),
+                contentDescription = null,
+                contentScale = ContentScale.Fit,  // ← Fit = NO CROPPING, people stay visible
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(16.dp))
+                    .drawWithContent {
+                        drawContent()
+                        // Alpha mask: full opacity until 60% of image height,
+                        // then fade gradually to transparent at 100%.
+                        // This 40% wide fade zone creates the seamless blend.
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colorStops = arrayOf(
+                                    0.00f to Color.Black,
+                                    0.60f to Color.Black,
+                                    1.00f to Color.Transparent
+                                )
+                            ),
+                            blendMode = BlendMode.DstIn
+                        )
+                    }
+            )
+        }
+
+        // 3. MULTI-STOP DARK GRADIENT (text legibility on blurred bg)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -406,17 +435,13 @@ fun BitChordPlayer(
         )
 
         // 6. Main content column — bottom aligned, sits on top of blurred bg + scrim
-        //    IMPORTANT: bottom padding is 96.dp so the action buttons
-        //    (Shuffle/Repeat/Loop/Menu) sit ABOVE the floating Queue pill,
-        //    not behind it. The Queue pill (~72dp tall) lives at the very bottom
-        //    of the screen via Player.kt's BottomSheet, so we leave room for it.
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .padding(top = 40.dp, bottom = 96.dp)
+                .padding(top = 40.dp, bottom = 32.dp)
         ) {
             // ---- Title + Artist + Heart row ----
             Row(
@@ -564,10 +589,9 @@ fun BitChordPlayer(
 
                 // Play/Pause — large icon, no filled circle background
                 // Uses BitChordIcons directly with white tint so it shows on blurred bg
-                // Bumped from 48dp to 64dp so the icon is prominent (BITCHORD style).
                 Box(
                     modifier = Modifier
-                        .size(96.dp)
+                        .size(72.dp)
                         .clickable {
                             if (shouldBePlaying) binder.player.pause() else {
                                 if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
@@ -581,7 +605,7 @@ fun BitChordPlayer(
                                        else BitChordIcons.Play,
                         contentDescription = if (shouldBePlaying) "Pause" else "Play",
                         tint = Color.White,
-                        modifier = Modifier.size(64.dp)
+                        modifier = Modifier.size(48.dp)
                     )
                 }
 
