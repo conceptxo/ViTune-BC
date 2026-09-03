@@ -558,7 +558,8 @@ fun Player(
                 },
                 onArtistClick = {
                     // Artist click navigation disabled to stabilize builds
-                },  
+                },
+                onOpenLyricsDialog = { isShowingLyricsDialog = true },
                 
                  modifier = Modifier
                     .padding(vertical = 8.dp)
