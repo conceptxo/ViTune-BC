@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -25,9 +24,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -43,22 +44,20 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import app.vitune.android.Database
-import app.vitune.android.R
 import app.vitune.android.models.Lyrics as LyricsData
 import app.vitune.android.models.ui.toUiMedia
 import app.vitune.android.preferences.PlayerPreferences
 import app.vitune.android.service.LOCAL_KEY_PREFIX
 import app.vitune.android.service.PlayerService
 import app.vitune.android.transaction
-import app.vitune.android.ui.components.SeekBar
-import app.vitune.android.ui.components.themed.IconButton
+import app.vitune.android.ui.components.ThinSlider
+import app.vitune.android.ui.icons.BitChordIcons
 import app.vitune.android.utils.SynchronizedLyrics
 import app.vitune.android.utils.SynchronizedLyricsState
 import app.vitune.android.utils.forceSeekToNext
@@ -306,18 +305,18 @@ fun BitChordPlayer(
     }
     // --- end inline synced lyric line ---
 
+    // ThinSlider state — local scrub value while user drags, null = follow player
+    var scrubValue by remember { mutableFloatStateOf(0f) }
+    var scrubbing by remember { mutableStateOf(false) }
+    val sliderValue = if (scrubbing) scrubValue
+                      else if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f)
+                      else 0f
+
     // ====================================================================
     //  APPLE-MUSIC-STYLE NOW PLAYING
-    //  - Top half: crisp album art (full bleed)
-    //  - Bottom half: BLURRED album art
-    //  - Seamless blend via gradient alpha mask on crisp image's bottom edge
-    //  - Dark scrim over the blurred part for text legibility
-    //  - Controls overlaid on the blurred bottom half
     // ====================================================================
     Box(modifier = modifier.fillMaxSize()) {
         // 1. BLURRED BACKGROUND — full screen, blurred album art
-        //    blur() requires API 31+ (Android 12). On older devices, image is unblurred
-        //    (acceptable fallback — text legibility is still preserved by the scrim below).
         AsyncImage(
             model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
             contentDescription = null,
@@ -331,12 +330,8 @@ fun BitChordPlayer(
                 }
         )
 
-        // 2. CRISP TOP IMAGE — top 55% of screen, with seamless fade-out at bottom edge
-        //    The fade-out is achieved via drawWithContent + Brush.verticalGradient + BlendMode.DstIn.
-        //    DstIn keeps destination pixels where source alpha > 0:
-        //      - Top 80% of this image: gradient is Color.Black (alpha=1) → image fully visible
-        //      - Bottom 20% of this image: gradient fades to Transparent (alpha=0) → image fades out
-        //    As the crisp image fades out, the blurred background shows through → seamless blend.
+        // 2. CRISP TOP IMAGE — top 55% of screen, fades out at its bottom edge
+        //    into the blurred background below — seamless blend.
         Box(
             modifier = Modifier
                 .fillMaxWidth()
@@ -351,12 +346,11 @@ fun BitChordPlayer(
                     .fillMaxSize()
                     .drawWithContent {
                         drawContent()
-                        // Mask: fade out the bottom 20% of this image to transparent
                         drawRect(
                             brush = Brush.verticalGradient(
-                                colorStops = listOf(
-                                    0.75f to Color.Black,       // top 75%: keep image fully
-                                    1.0f to Color.Transparent   // bottom 25%: fade to transparent
+                                colorStops = arrayOf(
+                                    0.75f to Color.Black,
+                                    1.0f to Color.Transparent
                                 )
                             ),
                             blendMode = BlendMode.DstIn
@@ -366,13 +360,12 @@ fun BitChordPlayer(
         }
 
         // 3. DARK SCRIM on the bottom half — for text legibility on the blurred bg
-        //    Transparent at ~50% screen height → black 65% at bottom
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colorStops = listOf(
+                        colorStops = arrayOf(
                             0.40f to Color.Transparent,
                             0.55f to Color.Black.copy(alpha = 0.25f),
                             0.75f to Color.Black.copy(alpha = 0.55f),
@@ -455,15 +448,12 @@ fun BitChordPlayer(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Image(
-                        painter = painterResource(
-                            if (likedAt == null) R.drawable.heart_outline else R.drawable.heart
-                        ),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(
-                            if (likedAt != null) colorPalette.favoritesIcon else Color.White
-                        ),
-                        modifier = Modifier.size(20.dp)
+                    Icon(
+                        imageVector = if (likedAt == null) BitChordIcons.Heart
+                                      else BitChordIcons.HeartFilled,
+                        contentDescription = "Like",
+                        tint = if (likedAt != null) colorPalette.favoritesIcon else Color.White,
+                        modifier = Modifier.size(22.dp)
                     )
                 }
             }
@@ -480,10 +470,10 @@ fun BitChordPlayer(
             ) {
                 if (showNoteGlyph) {
                     Image(
-                        painter = painterResource(R.drawable.musical_notes),
+                        imageVector = BitChordIcons.MusicNote,
                         contentDescription = null,
                         colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.6f)),
-                        modifier = Modifier.size(12.dp)
+                        modifier = Modifier.size(14.dp)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                 }
@@ -501,22 +491,46 @@ fun BitChordPlayer(
                     )
                 }
                 Spacer(modifier = Modifier.width(4.dp))
-                BasicText(
-                    text = "\u203A",
-                    style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.7f))
+                Image(
+                    imageVector = BitChordIcons.ChevronRight,
+                    contentDescription = null,
+                    colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.7f)),
+                    modifier = Modifier.size(14.dp)
                 )
             }
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ---- SeekBar ----
-            SeekBar(
-                binder = binder,
-                position = position,
-                media = media,
-                alwaysShowDuration = true,
-                style = PlayerPreferences.SeekBarStyle.Static
-            )
+            // ---- ThinSlider (Apple Music style) + timestamps ----
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                BasicText(
+                    text = formatTime(if (scrubbing) (scrubValue * duration).toLong() else position),
+                    style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.6f))
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                ThinSlider(
+                    value = sliderValue,
+                    onValueChange = {
+                        scrubbing = true
+                        scrubValue = it
+                    },
+                    onValueChangeFinished = {
+                        val targetMs = (scrubValue * duration).toLong()
+                        binder.player.seekTo(targetMs)
+                        scrubbing = false
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                BasicText(
+                    text = "-${formatTime((duration - (if (scrubbing) (scrubValue * duration).toLong() else position)).coerceAtLeast(0L))}",
+                    style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.6f))
+                )
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
 
@@ -526,16 +540,25 @@ fun BitChordPlayer(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                IconButton(
-                    icon = R.drawable.play_skip_back,
-                    color = Color.White,
-                    onClick = { binder.player.forceSeekToPrevious() },
-                    modifier = Modifier.size(36.dp)
-                )
-
                 Box(
                     modifier = Modifier
-                        .size(64.dp)
+                        .size(48.dp)
+                        .clickable { binder.player.forceSeekToPrevious() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = BitChordIcons.SkipPrevious,
+                        contentDescription = "Previous",
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+
+                // Play/Pause — large icon, no filled circle background
+                // Uses BitChordIcons directly with white tint so it shows on blurred bg
+                Box(
+                    modifier = Modifier
+                        .size(72.dp)
                         .clickable {
                             if (shouldBePlaying) binder.player.pause() else {
                                 if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
@@ -544,23 +567,33 @@ fun BitChordPlayer(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    AnimatedPlayPauseButton(
-                        playing = shouldBePlaying,
+                    Icon(
+                        imageVector = if (shouldBePlaying) BitChordIcons.Pause
+                                       else BitChordIcons.Play,
+                        contentDescription = if (shouldBePlaying) "Pause" else "Play",
+                        tint = Color.White,
                         modifier = Modifier.size(48.dp)
                     )
                 }
 
-                IconButton(
-                    icon = R.drawable.play_skip_forward,
-                    color = Color.White,
-                    onClick = { binder.player.forceSeekToNext() },
-                    modifier = Modifier.size(36.dp)
-                )
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clickable { binder.player.forceSeekToNext() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = BitChordIcons.SkipNext,
+                        contentDescription = "Next",
+                        tint = Color.White,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ---- Secondary row: Shuffle / Repeat / Loop / Queue ----
+            // ---- Secondary row: Shuffle / Repeat / Loop / Queue (all as icons) ----
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
@@ -569,25 +602,30 @@ fun BitChordPlayer(
                 // Shuffle
                 Box(
                     modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (shuffleOn) Color.White.copy(alpha = 0.2f) else Color.Transparent
+                        )
                         .clickable {
                             shuffleOn = !shuffleOn
                             binder.player.shuffleModeEnabled = shuffleOn
-                        }
-                        .padding(horizontal = 8.dp, vertical = 8.dp)
+                        },
+                    contentAlignment = Alignment.Center
                 ) {
-                    BasicText(
-                        text = "Shuffle",
-                        style = typography.xs.semiBold.copy(
-                            color = if (shuffleOn) Color.White
-                                    else Color.White.copy(alpha = 0.4f)
-                        )
+                    Icon(
+                        imageVector = BitChordIcons.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (shuffleOn) Color.White
+                               else Color.White.copy(alpha = 0.4f),
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
-                // Repeat — "1" inside circle when Repeat One, "↻" otherwise
+                // Repeat
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(44.dp)
                         .clip(RoundedCornerShape(50))
                         .background(
                             if (repeatMode != Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.2f)
@@ -603,19 +641,20 @@ fun BitChordPlayer(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    BasicText(
-                        text = if (repeatMode == Player.REPEAT_MODE_ONE) "1" else "\u21BB",
-                        style = typography.s.semiBold.copy(
-                            color = if (repeatMode != Player.REPEAT_MODE_OFF) Color.White
-                                    else Color.White.copy(alpha = 0.4f)
-                        )
+                    Icon(
+                        imageVector = if (repeatMode == Player.REPEAT_MODE_ONE) BitChordIcons.RepeatOne
+                                       else BitChordIcons.Repeat,
+                        contentDescription = "Repeat",
+                        tint = if (repeatMode != Player.REPEAT_MODE_OFF) Color.White
+                               else Color.White.copy(alpha = 0.4f),
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
-                // Infinity loop inside circle
+                // Infinity loop
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
+                        .size(44.dp)
                         .clip(RoundedCornerShape(50))
                         .background(
                             if (PlayerPreferences.trackLoopEnabled) Color.White.copy(alpha = 0.2f)
@@ -626,27 +665,43 @@ fun BitChordPlayer(
                         },
                     contentAlignment = Alignment.Center
                 ) {
-                    Image(
-                        painter = painterResource(R.drawable.infinite),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(
-                            if (PlayerPreferences.trackLoopEnabled) Color.White
-                            else Color.White.copy(alpha = 0.4f)
-                        ),
-                        modifier = Modifier.size(20.dp)
+                    Icon(
+                        imageVector = BitChordIcons.Infinity,
+                        contentDescription = "Loop",
+                        tint = if (PlayerPreferences.trackLoopEnabled) Color.White
+                               else Color.White.copy(alpha = 0.4f),
+                        modifier = Modifier.size(22.dp)
                     )
                 }
 
-                // Queue (ellipsis icon)
-                IconButton(
-                    icon = R.drawable.ellipsis_horizontal,
-                    color = Color.White,
-                    onClick = onOpenQueue,
-                    modifier = Modifier.size(28.dp)
-                )
+                // Queue
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Transparent)
+                        .clickable(onOpenQueue),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = BitChordIcons.Queue,
+                        contentDescription = "Queue",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
             }
 
             Spacer(modifier = Modifier.height(8.dp))
         }
     }
+}
+
+/** Format milliseconds as "M:SS" (e.g. 1:09). */
+private fun formatTime(ms: Long): String {
+    if (ms <= 0) return "0:00"
+    val totalSeconds = ms / 1000
+    val minutes = totalSeconds / 60
+    val seconds = totalSeconds % 60
+    return "%d:%02d".format(minutes, seconds)
 }
