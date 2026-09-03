@@ -356,10 +356,11 @@ fun BitChordPlayer(
         // 2. CRISP ALBUM ART — horizontal rectangle, ContentScale.Fit (NO CROPPING)
         //    Size: full width × 420dp height (bigger, fills more screen)
         //    Position: top-center, 16dp from the top
-        //    NO dark gradient on the art itself — the user explicitly asked
-        //    to remove it. The art shows in its original colors.
-        //    Bottom edge fades to transparent (alpha mask) so it blends
-        //    seamlessly with the blurred background below.
+        //    BOTTOM EDGE FADE: Only the very bottom 20% of the image fades
+        //    to transparent. This is a SOFT alpha mask (NOT a black gradient) —
+        //    the image's own colors are preserved, the bottom just becomes
+        //    gradually see-through so it blends into the blurred bg below.
+        //    NO black band, NO dark overlay on the cover itself.
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -379,16 +380,18 @@ fun BitChordPlayer(
                     .clip(RoundedCornerShape(16.dp))
                     .drawWithContent {
                         drawContent()
-                        // Alpha mask: full opacity until 70% of image height,
+                        // Soft alpha mask: full opacity until 85% of image height,
                         // then fade gradually to transparent at 100%.
-                        // This 30% fade zone creates the seamless blend with blur.
-                        // NOTE: This is an ALPHA mask (BlendMode.DstIn), NOT a
-                        // black gradient overlay — the art's colors are preserved.
+                        // Only the very bottom 15% fades — the rest of the cover
+                        // shows in its original colors. NO black band.
+                        // (This is the technique the RiMusic guy described:
+                        //  Brush.verticalGradient with BlendMode.DstIn, applied
+                        //  only at the bottom part of the box.)
                         drawRect(
                             brush = Brush.verticalGradient(
                                 colorStops = arrayOf(
                                     0.00f to Color.Black,
-                                    0.70f to Color.Black,
+                                    0.85f to Color.Black,
                                     1.00f to Color.Transparent
                                 )
                             ),
@@ -399,6 +402,10 @@ fun BitChordPlayer(
         }
 
         // 3. MULTI-STOP DARK GRADIENT (text legibility on blurred bg)
+        //    IMPORTANT: This gradient starts at 55% screen height (NOT 45%),
+        //    so it does NOT overlap the album art. The album art (420dp tall)
+        //    ends around 55% screen height, and the dark scrim only kicks in
+        //    AFTER that — keeping the cover's colors intact.
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -406,11 +413,10 @@ fun BitChordPlayer(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
                             0.00f to Color.Black.copy(alpha = 0.00f),
-                            0.30f to Color.Black.copy(alpha = 0.05f),
-                            0.45f to Color.Black.copy(alpha = 0.30f),
-                            0.55f to Color.Black.copy(alpha = 0.55f),
-                            0.70f to Color.Black.copy(alpha = 0.80f),
-                            0.85f to Color.Black.copy(alpha = 0.92f),
+                            0.50f to Color.Black.copy(alpha = 0.00f),
+                            0.55f to Color.Black.copy(alpha = 0.10f),
+                            0.65f to Color.Black.copy(alpha = 0.40f),
+                            0.80f to Color.Black.copy(alpha = 0.75f),
                             1.00f to Color.Black.copy(alpha = 0.97f)
                         )
                     )
@@ -637,27 +643,8 @@ fun BitChordPlayer(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ---- Chevron-up arrow button — opens the queue sheet ----
-            // Placed BETWEEN the playback controls and the 4-icon row,
-            // exactly like the reference app (BITCHORD).
-            Box(
-                modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(50))
-                    .clickable { onExpandQueue() },
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.chevron_up),
-                    contentDescription = "Open Queue",
-                    colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.7f)),
-                    modifier = Modifier.size(24.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
             // ---- Secondary row: Shuffle / Repeat / Loop / Menu (all as icons) ----
+            // This row sits ABOVE the chevron-up arrow (per user's request).
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
@@ -754,6 +741,25 @@ fun BitChordPlayer(
                         modifier = Modifier.size(22.dp)
                     )
                 }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ---- Chevron-up arrow button — opens the queue sheet ----
+            // Placed at the VERY BOTTOM (below the 4-icon row), per user's request.
+            // Small (24dp) so it doesn't block any other controls.
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clickable { onExpandQueue() },
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.chevron_up),
+                    contentDescription = "Open Queue",
+                    colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.6f)),
+                    modifier = Modifier.size(20.dp)
+                )
             }
 
             Spacer(modifier = Modifier.height(8.dp))
