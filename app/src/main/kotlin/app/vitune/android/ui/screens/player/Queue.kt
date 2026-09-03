@@ -224,21 +224,23 @@ collapsedContent = { innerModifier ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontalBottomPaddingValues),
-                contentAlignment = Alignment.Center
+                    .padding(horizontalBottomPaddingValues)
+                    .padding(bottom = 60.dp),  // Moved up away from home button
+                contentAlignment = Alignment.BottomCenter
             ) {
-                Box(
+                // Clean chevron-up button — replaces the old "Queue" pill.
+                // Tapping it expands the queue sheet (default BottomSheet behavior).
+                // Swipe-up gesture also works (BottomSheet handles it automatically).
+                Image(
+                    painter = painterResource(R.drawable.chevron_up),
+                    contentDescription = "Open Queue",
+                    colorFilter = ColorFilter.tint(colorPalette.text),
                     modifier = Modifier
-                        .clip(RoundedCornerShape(50))
                         .then(innerModifier)
-                        .background(colorPalette.accent)
-                        .padding(horizontal = 24.dp, vertical = 10.dp)
-                ) {
-                    BasicText(
-                        text = "Queue",
-                        style = typography.xs.semiBold.copy(color = colorPalette.onAccent)
-                    )
-                }
+                        .size(32.dp)
+                        .clip(RoundedCornerShape(50))
+                        .padding(4.dp)
+                )
             }
 }
     ) {
