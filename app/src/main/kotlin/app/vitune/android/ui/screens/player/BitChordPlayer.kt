@@ -263,7 +263,6 @@ fun BitChordPlayer(
             offset = file?.offset?.inWholeMilliseconds ?: 0L
         )
     }
-
     val synchronizedLyrics = remember(lyricsState) {
         lyricsState.sentences?.let {
             SynchronizedLyrics(it.toImmutableMap()) {
@@ -286,7 +285,7 @@ fun BitChordPlayer(
     }
     val currentLyricLine = currentSentenceRaw?.takeIf { it.isNotBlank() }
     val isInstrumentalGap = currentSentenceRaw != null && currentSentenceRaw.isBlank()
-    
+
     var searchPhraseIndex by remember(mediaItem.mediaId) { mutableIntStateOf(0) }
     LaunchedEffect(mediaItem.mediaId, isFetchingLyrics) {
         if (!isFetchingLyrics) return@LaunchedEffect
@@ -448,7 +447,6 @@ fun BitChordPlayer(
                         }
                     )
                 }
-
                 // Heart inside a 40dp translucent circle
                 Box(
                     modifier = Modifier
@@ -602,7 +600,113 @@ fun BitChordPlayer(
                     )
                 }
             }
-            /** Format milliseconds as "M:SS" (e.g. 1:09). */
+            Spacer(modifier = Modifier.height(24.dp))
+
+            // ---- Secondary row: Shuffle / Repeat / Loop / Menu (all as icons) ----
+            Row(
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                // Shuffle
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (shuffleOn) Color.White.copy(alpha = 0.2f) else Color.Transparent
+                        )
+                        .clickable {
+                            shuffleOn = !shuffleOn
+                            binder.player.shuffleModeEnabled = shuffleOn
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = BitChordIcons.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (shuffleOn) Color.White
+                               else Color.White.copy(alpha = 0.4f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                // Repeat
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (repeatMode != Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.2f)
+                            else Color.Transparent
+                        )
+                        .clickable {
+                            repeatMode = when (repeatMode) {
+                                Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
+                                Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
+                                else -> Player.REPEAT_MODE_OFF
+                            }
+                            binder.player.repeatMode = repeatMode
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (repeatMode == Player.REPEAT_MODE_ONE) BitChordIcons.RepeatOne
+                                       else BitChordIcons.Repeat,
+                        contentDescription = "Repeat",
+                        tint = if (repeatMode != Player.REPEAT_MODE_OFF) Color.White
+                               else Color.White.copy(alpha = 0.4f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                // Infinity loop
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            if (PlayerPreferences.trackLoopEnabled) Color.White.copy(alpha = 0.2f)
+                            else Color.Transparent
+                        )
+                        .clickable {
+                            PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = BitChordIcons.Infinity,
+                        contentDescription = "Loop",
+                        tint = if (PlayerPreferences.trackLoopEnabled) Color.White
+                               else Color.White.copy(alpha = 0.4f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                // Menu (three dots) — opens the player menu (queue, sleep timer, etc.)
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(Color.Transparent)
+                        .clickable { onOpenQueue() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = BitChordIcons.MoreVertical,
+                        contentDescription = "More",
+                        tint = Color.White,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(8.dp))
+        }
+    }
+}
+
+/** Format milliseconds as "M:SS" (e.g. 1:09). */
 private fun formatTime(ms: Long): String {
     if (ms <= 0) return "0:00"
     val totalSeconds = ms / 1000
