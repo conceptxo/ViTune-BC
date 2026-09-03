@@ -562,7 +562,6 @@ fun Player(
                 onOpenLyricsDialog = { isShowingLyricsDialog = true },
                 
                  modifier = Modifier
-                
                     .fillMaxWidth()
                     .weight(1f)
             )
