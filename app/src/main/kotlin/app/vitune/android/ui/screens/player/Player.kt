@@ -528,7 +528,7 @@ fun Player(
             )
         } else Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = containerModifier.padding(top = 54.dp)
+            modifier = Modifier.fillMaxSize()
         ) {
             BitChordPlayer(
                 mediaItem = mediaItem!!,
@@ -562,7 +562,7 @@ fun Player(
                 onOpenLyricsDialog = { isShowingLyricsDialog = true },
                 
                  modifier = Modifier
-                    .padding(vertical = 8.dp)
+                
                     .fillMaxWidth()
                     .weight(1f)
             )
