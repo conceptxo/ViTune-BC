@@ -1,31 +1,48 @@
 package app.vitune.android.ui.screens.player
 
+import android.media.AudioManager
+import android.provider.Settings
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -37,12 +54,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -51,8 +67,8 @@ import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import app.vitune.android.R
 import app.vitune.android.Database
+import app.vitune.android.R
 import app.vitune.android.models.Lyrics as LyricsData
 import app.vitune.android.models.ui.toUiMedia
 import app.vitune.android.preferences.PlayerPreferences
@@ -81,6 +97,10 @@ import app.vitune.providers.lrclib.toLrcFile
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import coil3.request.crossfade
+import coil3.request.allowHardware
+import coil3.SingletonImageLoader
+import coil3.toBitmap
+import androidx.palette.graphics.Palette
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.CancellationException
@@ -104,6 +124,13 @@ private val LYRIC_SEARCH_PHRASES = listOf(
     "One more source to check"
 )
 
+private val FallbackColors = listOf(
+    Color(0xFF1A1A2E),
+    Color(0xFF16213E),
+    Color(0xFF0F3460),
+    Color(0xFF533483)
+)
+
 @Composable
 fun BitChordPlayer(
     mediaItem: MediaItem,
@@ -119,16 +146,47 @@ fun BitChordPlayer(
     onTitleClick: (() -> Unit)? = null,
     onArtistClick: (() -> Unit)? = null,
     onOpenLyricsDialog: () -> Unit = {},
-    onExpandQueue: () -> Unit = {},  // NEW: opens the queue sheet (chevron-up arrow)
+    onExpandQueue: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val (colorPalette, typography) = LocalAppearance.current
+    val context = LocalContext.current
     val metadata = mediaItem.mediaMetadata
     val media = remember(mediaItem, duration) { mediaItem.toUiMedia(duration) }
 
-    // NOTE: Removed the artScale animation — it was causing the background
-    // to visibly shrink/expand on play/pause, which looked jarring.
-    // The album art now stays perfectly still (matches BITCHORD/YumaPlayer).
+    // --- Extract colors from album art for the gradient background ---
+    var bgColors by remember(mediaItem.mediaId) {
+        mutableStateOf(FallbackColors)
+    }
+    LaunchedEffect(mediaItem.mediaId) {
+        val artworkUri = metadata.artworkUri?.toString()
+        if (artworkUri != null) {
+            withContext(Dispatchers.IO) {
+                runCatching {
+                    val request = ImageRequest.Builder(context)
+                        .data(artworkUri)
+                        .size(128)
+                        .allowHardware(false)
+                        .build()
+                    val result = SingletonImageLoader.get(context).execute(request)
+                    val bitmap = (result as? coil3.request.SuccessResult)?.image?.toBitmap()
+                    if (bitmap != null) {
+                        val palette = Palette.from(bitmap)
+                            .maximumColorCount(8)
+                            .generate()
+                        val colors = palette.swatches
+                            .sortedByDescending { it.population }
+                            .map { Color(it.rgb) }
+                            .distinct()
+                            .take(4)
+                        if (colors.isNotEmpty()) {
+                            bgColors = colors + FallbackColors.take(4 - colors.size)
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     var shuffleOn by remember { mutableStateOf(binder.player.shuffleModeEnabled) }
     var repeatMode by remember { mutableStateOf(binder.player.repeatMode) }
@@ -146,24 +204,19 @@ fun BitChordPlayer(
                     .cancellable()
                     .collect { currentLyrics ->
                         storedLyrics = currentLyrics
-
                         if (currentLyrics?.fixed != null && currentLyrics.synced != null) {
                             isFetchingLyrics = false
                             return@collect
                         }
-
                         isFetchingLyrics = true
-
                         val album = metadata.albumTitle?.toString()
                         val artist = metadata.artist?.toString().orEmpty()
                         val title = metadata.title?.toString().orEmpty().let {
                             if (mediaItem.mediaId.startsWith(LOCAL_KEY_PREFIX)) it
-                                .substringBeforeLast('.')
-                                .trim()
+                                .substringBeforeLast('.').trim()
                             else it
                         }
                         val strippedTitle = title.split("(")[0].trim()
-
                         coroutineScope {
                             val durationDeferred = async {
                                 var d = withContext(Dispatchers.Main) {
@@ -177,64 +230,44 @@ fun BitChordPlayer(
                                 }
                                 d
                             }
-
                             val innertube = async(Dispatchers.IO) {
                                 runCatching {
                                     Innertube.lyrics(NextBody(videoId = mediaItem.mediaId))?.getOrNull()
                                 }.getOrNull()
                             }
-
                             val fixed = currentLyrics?.fixed ?: innertube.await() ?: run {
                                 val d = durationDeferred.await()
                                 runCatching {
-                                    LrcLib.bestLyrics(
-                                        artist = artist,
-                                        title = title,
-                                        duration = d.milliseconds,
-                                        album = album,
-                                        synced = false
+                                    LrcLib.bestLyrics(artist = artist, title = title,
+                                        duration = d.milliseconds, album = album, synced = false
                                     )?.map { it?.text }?.getOrNull()
                                 }.getOrNull()
                             }
-
                             val synced = currentLyrics?.synced ?: run {
                                 val d = durationDeferred.await()
-
                                 val lrcMain = async(Dispatchers.IO) {
                                     runCatching {
-                                        LrcLib.bestLyrics(
-                                            artist = artist,
-                                            title = title,
-                                            duration = d.milliseconds,
-                                            album = album
+                                        LrcLib.bestLyrics(artist = artist, title = title,
+                                            duration = d.milliseconds, album = album
                                         )?.map { it?.text }?.getOrNull()
                                     }.getOrNull()
                                 }
                                 val lrcRetry = async(Dispatchers.IO) {
                                     runCatching {
-                                        LrcLib.bestLyrics(
-                                            artist = artist,
-                                            title = strippedTitle,
-                                            duration = d.milliseconds,
-                                            album = album
+                                        LrcLib.bestLyrics(artist = artist, title = strippedTitle,
+                                            duration = d.milliseconds, album = album
                                         )?.map { it?.text }?.getOrNull()
                                     }.getOrNull()
                                 }
                                 val kugou = async(Dispatchers.IO) {
                                     runCatching {
-                                        KuGou.lyrics(
-                                            artist = artist,
-                                            title = title,
-                                            duration = d / 1000
+                                        KuGou.lyrics(artist = artist, title = title, duration = d / 1000
                                         )?.map { it?.value }?.getOrNull()
                                     }.getOrNull()
                                 }
                                 lrcMain.await() ?: lrcRetry.await() ?: kugou.await()
                             }
-
-                            LyricsData(
-                                songId = mediaItem.mediaId,
-                                fixed = fixed.orEmpty(),
+                            LyricsData(songId = mediaItem.mediaId, fixed = fixed.orEmpty(),
                                 synced = synced.orEmpty()
                             ).also {
                                 ensureActive()
@@ -246,7 +279,6 @@ fun BitChordPlayer(
                                 }
                             }
                         }
-
                         isFetchingLyrics = false
                     }
             }
@@ -260,13 +292,9 @@ fun BitChordPlayer(
         val file = storedLyrics?.synced?.takeIf { it.isNotBlank() }?.let {
             LrcParser.parse(it)?.toLrcFile()
         }
-
-        SynchronizedLyricsState(
-            sentences = file?.lines,
-            offset = file?.offset?.inWholeMilliseconds ?: 0L
-        )
+        SynchronizedLyricsState(sentences = file?.lines,
+            offset = file?.offset?.inWholeMilliseconds ?: 0L)
     }
-
     val synchronizedLyrics = remember(lyricsState) {
         lyricsState.sentences?.let {
             SynchronizedLyrics(it.toImmutableMap()) {
@@ -275,21 +303,15 @@ fun BitChordPlayer(
             }
         }
     }
-
     LaunchedEffect(synchronizedLyrics) {
         val current = synchronizedLyrics ?: return@LaunchedEffect
-        while (true) {
-            delay(INLINE_LYRIC_UPDATE_DELAY)
-            current.update()
-        }
+        while (true) { delay(INLINE_LYRIC_UPDATE_DELAY); current.update() }
     }
-
     val currentSentenceRaw = synchronizedLyrics?.let {
         it.sentences.values.toImmutableList().getOrNull(it.index)
     }
     val currentLyricLine = currentSentenceRaw?.takeIf { it.isNotBlank() }
     val isInstrumentalGap = currentSentenceRaw != null && currentSentenceRaw.isBlank()
-
     var searchPhraseIndex by remember(mediaItem.mediaId) { mutableIntStateOf(0) }
     LaunchedEffect(mediaItem.mediaId, isFetchingLyrics) {
         if (!isFetchingLyrics) return@LaunchedEffect
@@ -298,7 +320,6 @@ fun BitChordPlayer(
             searchPhraseIndex = (searchPhraseIndex + 1) % LYRIC_SEARCH_PHRASES.size
         }
     }
-
     val showSearchingGlyph = isFetchingLyrics && currentLyricLine == null && !isInstrumentalGap
     val showNoteGlyph = showSearchingGlyph || isInstrumentalGap
     val lyricStripText = when {
@@ -307,99 +328,72 @@ fun BitChordPlayer(
         isFetchingLyrics -> LYRIC_SEARCH_PHRASES[searchPhraseIndex]
         else -> "Tap for lyrics"
     }
-    // --- end inline synced lyric line ---
 
-    // ThinSlider state — local scrub value while user drags, null = follow player
+    // --- ThinSlider state for seekbar ---
     var scrubValue by remember { mutableFloatStateOf(0f) }
     var scrubbing by remember { mutableStateOf(false) }
     val sliderValue = if (scrubbing) scrubValue
                       else if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f)
                       else 0f
 
-    // ====================================================================
-    //  HYBRID BACKGROUND (Apple Music / YumaPlayer style)
-    //
-    //  Layer 1: BLURRED FULL-SCREEN album art (background)
-    //           - Fills entire screen edge-to-edge
-    //           - 48dp blur radius → frosted glass effect
-    //           - Even low-res art looks smooth because it's blurred
-    //           - crossfade(400ms) for smooth song transitions
-    //
-    //  Layer 2: CRISP album art at NORMAL SIZE (horizontal rectangle)
-    //           - NOT stretched to fill screen → no pixelation
-    //           - Uses ContentScale.Fit → preserves aspect ratio, NO CROPPING
-    //             (people/faces stay visible!)
-    //           - Bottom edge FADES TO TRANSPARENT → seamless blend with blur
-    //           - Empty space around the art is filled by the blurred bg
-    //
-    //  Layer 3: MULTI-STOP DARK GRADIENT over the bottom half
-    //           - Text legibility on top of the blurred bg
-    //  ====================================================================
-    Box(modifier = Modifier
-        .fillMaxSize()
-        .background(Color.Black)  // Solid black base — prevents system wallpaper
-                                   // from showing through during image transitions
-    ) {
-        // 1. BLURRED FULL-SCREEN BACKGROUND
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px))
-                .crossfade(400)
-                .build(),
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(48.dp)
-        )
+    // --- Volume bar state (system volume) ---
+    val audioManager = remember(context) {
+        context.getSystemService(AudioManager::class.java)
+    }
+    val maxVolume = remember(audioManager) {
+        audioManager?.getStreamMaxVolume(AudioManager.STREAM_MUSIC)?.coerceAtLeast(1) ?: 15
+    }
+    var systemVolume by remember { mutableFloatStateOf(
+        (audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: 0).toFloat() / maxVolume
+    )}
+    var volumeDragging by remember { mutableStateOf(false) }
+    DisposableEffect(audioManager) {
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                val current = audioManager?.getStreamVolume(AudioManager.STREAM_MUSIC) ?: return
+                systemVolume = current.toFloat() / maxVolume
+            }
+        }
+        context.contentResolver.registerContentObserver(
+            Settings.System.CONTENT_URI, true, observer)
+        onDispose { context.contentResolver.unregisterContentObserver(observer) }
+    }
 
-        // 2. CRISP ALBUM ART — SQUARE (centered, with blurred bg visible around it)
-        //    Size: 320dp × 320dp (about 85% of typical phone screen width)
-        //    Position: top-center, 24dp from the top
-        //    Aspect ratio 1:1 (square) — matches classic music player look.
-        //    The blurred background is visible AROUND the square art.
-        //    Bottom edge fades softly to transparent so it blends with blur.
-        //    NO black gradient on the art — colors stay original.
+    // --- Double-tap to favorite animation state ---
+    var showHeartPop by remember { mutableStateOf(false) }
+    LaunchedEffect(showHeartPop) {
+        if (showHeartPop) {
+            delay(800)
+            showHeartPop = false
+        }
+    }
+
+    // ====================================================================
+    //  NEW LAYOUT (Apple Music / BITCHORD inspired)
+    //  - Gradient background from album art colors
+    //  - "Now Playing" header at top
+    //  - Square album art with 10dp corners + shadow (NO gradient on art)
+    //  - Double-tap to favorite (heart pop animation)
+    //  - Song name + menu button beside it
+    //  - Artist name
+    //  - Play/pause/skip controls
+    //  - Volume bar
+    //  - Shuffle/Repeat/Loop/Queue row at bottom
+    // ====================================================================
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 1. GRADIENT BACKGROUND from album art colors
         Box(
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 24.dp)
-                .size(320.dp)
-        ) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px))
-                    .crossfade(400)
-                    .build(),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,  // ← Crop = fills the square (centered crop)
-                modifier = Modifier
-                    .fillMaxSize()
-                    .clip(RoundedCornerShape(20.dp))
-                    .drawWithContent {
-                        drawContent()
-                        // Soft alpha mask: full opacity until 85% of image height,
-                        // then fade gradually to transparent at 100%.
-                        // Only the very bottom 15% fades — colors stay intact.
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colorStops = arrayOf(
-                                    0.00f to Color.Black,
-                                    0.85f to Color.Black,
-                                    1.00f to Color.Transparent
-                                )
-                            ),
-                            blendMode = BlendMode.DstIn
-                        )
-                    }
-            )
-        }
-
-        // 3. MULTI-STOP DARK GRADIENT (text legibility on blurred bg)
-        //    IMPORTANT: This gradient starts at 50% screen height so it does
-        //    NOT overlap the square album art (which ends around 40% screen
-        //    height). This keeps the cover's colors intact while ensuring
-        //    white text is readable on the blurred bg in the lower half.
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = bgColors.take(2).let { (a, b) ->
+                            listOf(a, b, b.copy(alpha = 0.8f))
+                        }
+                    )
+                )
+        )
+        // 1b. Dark overlay at bottom for text legibility
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -407,19 +401,15 @@ fun BitChordPlayer(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
                             0.00f to Color.Black.copy(alpha = 0.00f),
-                            0.45f to Color.Black.copy(alpha = 0.00f),
                             0.50f to Color.Black.copy(alpha = 0.10f),
-                            0.65f to Color.Black.copy(alpha = 0.45f),
-                            0.80f to Color.Black.copy(alpha = 0.80f),
-                            1.00f to Color.Black.copy(alpha = 0.97f)
+                            0.75f to Color.Black.copy(alpha = 0.45f),
+                            1.00f to Color.Black.copy(alpha = 0.80f)
                         )
                     )
                 )
         )
 
-        // 4. Full lyrics overlay (when user taps the lyric strip)
-        //    onOpenDialog is now wired to onOpenLyricsDialog so the expand icon
-        //    (top-left of lyrics overlay) opens the LrcLib search dialog.
+        // 2. Lyrics overlay (when user taps lyric strip)
         Lyrics(
             mediaId = mediaItem.mediaId,
             isDisplayed = isShowingLyrics,
@@ -434,34 +424,79 @@ fun BitChordPlayer(
             showControls = true
         )
 
-        // 5. Top drag-handle pill
-        Box(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 12.dp)
-                .width(40.dp)
-                .height(4.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .background(Color.White.copy(alpha = 0.4f))
-        )
-
-        // 6. Main content column — bottom aligned but with LARGE bottom padding
-        //    so all controls (including the chevron-up arrow) sit ABOVE the
-        //    Android system navigation bar / gesture area.
-        //
-        //    Bottom padding 72dp ensures:
-        //    - 4-icon row (Shuffle/Repeat/Loop/Menu) sits at ~78% screen height (SAFE ZONE)
-        //    - Chevron-up arrow sits at ~88% screen height (HANDLE ZONE)
-        //    - No overlap with Android home/back gesture area
+        // 3. Main content column — bottom aligned, with nav bar padding
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .padding(top = 24.dp, bottom = 72.dp)
+                .padding(top = 16.dp)
+                .navigationBarsPadding()
         ) {
-            // ---- Title + Artist + Heart row ----
+            // ---- "Now Playing" header + tiny bar ----
+            BasicText(
+                text = "Now Playing",
+                style = typography.xs.semiBold.copy(
+                    color = Color.White.copy(alpha = 0.5f)
+                )
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Box(
+                modifier = Modifier
+                    .width(32.dp)
+                    .height(2.dp)
+                    .clip(RoundedCornerShape(1.dp))
+                    .background(Color.White.copy(alpha = 0.3f))
+            )
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ---- Album art (square, 10dp corners, shadow, double-tap to favorite) ----
+            Box(
+                modifier = Modifier
+                    .pointerInput(mediaItem.mediaId) {
+                        detectTapGestures(
+                            onDoubleTap = {
+                                setLikedAt(if (likedAt == null) System.currentTimeMillis() else null)
+                                showHeartPop = true
+                            }
+                        )
+                    }
+            ) {
+                AsyncImage(
+                    model = ImageRequest.Builder(context)
+                        .data(metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px))
+                        .crossfade(400)
+                        .build(),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(280.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .shadow(12.dp, RoundedCornerShape(10.dp))
+                )
+                // Heart pop animation on double-tap
+                AnimatedVisibility(
+                    visible = showHeartPop,
+                    enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
+                    exit = scaleOut(tween(400)) + fadeOut(tween(400)),
+                    modifier = Modifier.align(Alignment.Center)
+                ) {
+                    Image(
+                        imageVector = BitChordIcons.HeartFilled,
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(
+                            if (likedAt != null) colorPalette.favoritesIcon else Color.White
+                        ),
+                        modifier = Modifier.size(80.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ---- Song name + Menu button (side by side) ----
             Row(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
@@ -487,37 +522,31 @@ fun BitChordPlayer(
                         }
                     )
                 }
-
-                // Heart inside a 40dp translucent circle
+                // Menu button (three dots) — opens PlayerMenu
                 Box(
                     modifier = Modifier
-                        .size(40.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White.copy(alpha = 0.2f))
-                        .clickable {
-                            setLikedAt(if (likedAt == null) System.currentTimeMillis() else null)
-                        },
+                        .size(36.dp)
+                        .clickable { onOpenQueue() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (likedAt == null) BitChordIcons.Heart
-                                      else BitChordIcons.HeartFilled,
-                        contentDescription = "Like",
-                        tint = if (likedAt != null) colorPalette.favoritesIcon else Color.White,
-                        modifier = Modifier.size(22.dp)
+                        imageVector = BitChordIcons.MoreVertical,
+                        contentDescription = "Menu",
+                        tint = Color.White,
+                        modifier = Modifier.size(24.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(12.dp))
 
-            // ---- Inline lyric strip ----
+            // ---- Inline lyric strip (tap to open full lyrics) ----
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
                     .clickable { onShowLyrics(true) }
-                    .padding(vertical = 10.dp)
+                    .padding(vertical = 8.dp)
             ) {
                 if (showNoteGlyph) {
                     Image(
@@ -552,7 +581,7 @@ fun BitChordPlayer(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ---- ThinSlider (Apple Music style) + timestamps ----
+            // ---- Seekbar (ThinSlider) + timestamps ----
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -565,13 +594,9 @@ fun BitChordPlayer(
                 Spacer(modifier = Modifier.width(8.dp))
                 ThinSlider(
                     value = sliderValue,
-                    onValueChange = {
-                        scrubbing = true
-                        scrubValue = it
-                    },
+                    onValueChange = { scrubbing = true; scrubValue = it },
                     onValueChangeFinished = {
-                        val targetMs = (scrubValue * duration).toLong()
-                        binder.player.seekTo(targetMs)
+                        binder.player.seekTo((scrubValue * duration).toLong())
                         scrubbing = false
                     },
                     modifier = Modifier.weight(1f)
@@ -583,9 +608,9 @@ fun BitChordPlayer(
                 )
             }
 
-            Spacer(modifier = Modifier.height(20.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // ---- Main controls: prev / play-pause / next ----
+            // ---- Play/pause/skip controls ----
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
@@ -601,12 +626,9 @@ fun BitChordPlayer(
                         imageVector = BitChordIcons.SkipPrevious,
                         contentDescription = "Previous",
                         tint = Color.White,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                 }
-
-                // Play/Pause — large icon, no filled circle background
-                // Uses BitChordIcons directly with white tint so it shows on blurred bg
                 Box(
                     modifier = Modifier
                         .size(72.dp)
@@ -619,14 +641,12 @@ fun BitChordPlayer(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = if (shouldBePlaying) BitChordIcons.Pause
-                                       else BitChordIcons.Play,
+                        imageVector = if (shouldBePlaying) BitChordIcons.Pause else BitChordIcons.Play,
                         contentDescription = if (shouldBePlaying) "Pause" else "Play",
                         tint = Color.White,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(56.dp)
                     )
                 }
-
                 Box(
                     modifier = Modifier
                         .size(48.dp)
@@ -637,15 +657,50 @@ fun BitChordPlayer(
                         imageVector = BitChordIcons.SkipNext,
                         contentDescription = "Next",
                         tint = Color.White,
-                        modifier = Modifier.size(36.dp)
+                        modifier = Modifier.size(32.dp)
                     )
                 }
             }
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ---- Secondary row: Shuffle / Repeat / Loop / Menu (all as icons) ----
-            // This row sits ABOVE the chevron-up arrow (per user's request).
+            // ---- Volume bar ----
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(
+                    imageVector = BitChordIcons.MusicNote,
+                    contentDescription = null,
+                    tint = Color.White.copy(alpha = 0.6f),
+                    modifier = Modifier.size(16.dp)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                ThinSlider(
+                    value = systemVolume.coerceIn(0f, 1f),
+                    onValueChange = {
+                        volumeDragging = true
+                        audioManager?.setStreamVolume(
+                            AudioManager.STREAM_MUSIC,
+                            (it * maxVolume).toInt().coerceIn(0, maxVolume),
+                            0
+                        )
+                    },
+                    onValueChangeFinished = { volumeDragging = false },
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(modifier = Modifier.width(8.dp))
+                Icon(
+                    imageVector = BitChordIcons.MusicNote,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ---- Shuffle / Repeat / Loop / Queue row ----
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
@@ -654,7 +709,7 @@ fun BitChordPlayer(
                 // Shuffle
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(40.dp)
                         .clip(RoundedCornerShape(50))
                         .background(
                             if (shuffleOn) Color.White.copy(alpha = 0.2f) else Color.Transparent
@@ -668,16 +723,14 @@ fun BitChordPlayer(
                     Icon(
                         imageVector = BitChordIcons.Shuffle,
                         contentDescription = "Shuffle",
-                        tint = if (shuffleOn) Color.White
-                               else Color.White.copy(alpha = 0.4f),
+                        tint = if (shuffleOn) Color.White else Color.White.copy(alpha = 0.4f),
                         modifier = Modifier.size(22.dp)
                     )
                 }
-
                 // Repeat
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(40.dp)
                         .clip(RoundedCornerShape(50))
                         .background(
                             if (repeatMode != Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.2f)
@@ -702,11 +755,10 @@ fun BitChordPlayer(
                         modifier = Modifier.size(22.dp)
                     )
                 }
-
-                // Infinity loop
+                // Loop
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(40.dp)
                         .clip(RoundedCornerShape(50))
                         .background(
                             if (PlayerPreferences.trackLoopEnabled) Color.White.copy(alpha = 0.2f)
@@ -725,45 +777,25 @@ fun BitChordPlayer(
                         modifier = Modifier.size(22.dp)
                     )
                 }
-
-                // Menu (three dots) — opens the player menu (queue, sleep timer, etc.)
+                // Queue — opens the queue sheet
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(40.dp)
                         .clip(RoundedCornerShape(50))
                         .background(Color.Transparent)
-                        .clickable { onOpenQueue() },
+                        .clickable { onExpandQueue() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = BitChordIcons.MoreVertical,
-                        contentDescription = "More",
+                        imageVector = BitChordIcons.Queue,
+                        contentDescription = "Queue",
                         tint = Color.White,
                         modifier = Modifier.size(22.dp)
                     )
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
-
-            // ---- Chevron-up arrow button — opens the queue sheet ----
-            // Placed at the VERY BOTTOM (below the 4-icon row), per user's request.
-            // Small (24dp) so it doesn't block any other controls.
-            Box(
-                modifier = Modifier
-                    .size(28.dp)
-                    .clickable { onExpandQueue() },
-                contentAlignment = Alignment.Center
-            ) {
-                Image(
-                    painter = painterResource(R.drawable.chevron_up),
-                    contentDescription = "Open Queue",
-                    colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.6f)),
-                    modifier = Modifier.size(20.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
