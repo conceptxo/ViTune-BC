@@ -6,6 +6,7 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -151,9 +152,12 @@ fun BitChordPlayer(
     val media = remember(mediaItem, duration) { mediaItem.toUiMedia(duration) }
 
     // --- Extract colors from album art for the gradient background ---
-    var bgColors by remember(mediaItem.mediaId) {
-        mutableStateOf(FallbackColors)
-    }
+    // IMPORTANT: Do NOT key on mediaItem.mediaId — that would reset to
+    // FallbackColors (blue) on every song change, causing a blue flash.
+    // Instead, use remember without a key so the PREVIOUS song's colors
+    // persist until the new ones are extracted. Then animateColorAsState
+    // below smoothly crossfades from old → new colors.
+    var bgColors by remember { mutableStateOf(FallbackColors) }
     LaunchedEffect(mediaItem.mediaId) {
         val artworkUri = metadata.artworkUri?.toString()
         if (artworkUri != null) {
@@ -183,6 +187,21 @@ fun BitChordPlayer(
             }
         }
     }
+
+    // --- Smooth gradient color crossfade (800ms tween) ---
+    // When bgColors changes (new song's palette extracted), the gradient
+    // smoothly crossfades from the OLD colors to the NEW colors over 800ms.
+    // No more jarring cut from red → blue → yellow.
+    val animatedTopColor by animateColorAsState(
+        targetValue = bgColors.getOrElse(0) { FallbackColors[0] },
+        animationSpec = tween(durationMillis = 800),
+        label = "gradientTop"
+    )
+    val animatedBottomColor by animateColorAsState(
+        targetValue = bgColors.getOrElse(1) { FallbackColors[1] },
+        animationSpec = tween(durationMillis = 800),
+        label = "gradientBottom"
+    )
 
     var shuffleOn by remember { mutableStateOf(binder.player.shuffleModeEnabled) }
     var repeatMode by remember { mutableStateOf(binder.player.repeatMode) }
@@ -389,13 +408,12 @@ fun BitChordPlayer(
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = bgColors.take(2).let { (a, b) ->
-                            listOf(
-                                a,                   // top: dominant color (full opacity)
-                                b,                   // middle: second color (full opacity)
-                                b.copy(alpha = 1.0f)  // bottom: same as middle, full opacity
-                            )
-                        }
+                        // Use ANIMATED colors (smooth crossfade on song change)
+                        colors = listOf(
+                            animatedTopColor,
+                            animatedBottomColor,
+                            animatedBottomColor
+                        )
                     )
                 )
         )
@@ -538,7 +556,7 @@ fun BitChordPlayer(
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .clickable { onOpenQueue() },
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onOpenQueue() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -550,15 +568,16 @@ fun BitChordPlayer(
                 }
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(8.dp))
 
             // ---- Inline lyric strip (tap to open full lyrics) ----
+            // Tight padding (2dp) so it sits RIGHT above the seekbar with no gap.
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onShowLyrics(true) }
-                    .padding(vertical = 8.dp)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onShowLyrics(true) }
+                    .padding(vertical = 2.dp)
             ) {
                 if (showNoteGlyph) {
                     Image(
@@ -591,7 +610,7 @@ fun BitChordPlayer(
                 )
             }
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(4.dp))
 
             // ---- Seekbar (ThinSlider) + timestamps ----
             Row(
@@ -631,7 +650,7 @@ fun BitChordPlayer(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .clickable { binder.player.forceSeekToPrevious() },
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { binder.player.forceSeekToPrevious() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -644,12 +663,16 @@ fun BitChordPlayer(
                 Box(
                     modifier = Modifier
                         .size(72.dp)
-                        .clickable {
-                            if (shouldBePlaying) binder.player.pause() else {
-                                if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
-                                binder.player.play()
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,  // NO ripple/square shape on click
+                            onClick = {
+                                if (shouldBePlaying) binder.player.pause() else {
+                                    if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
+                                    binder.player.play()
+                                }
                             }
-                        },
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -662,7 +685,7 @@ fun BitChordPlayer(
                 Box(
                     modifier = Modifier
                         .size(48.dp)
-                        .clickable { binder.player.forceSeekToNext() },
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { binder.player.forceSeekToNext() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -726,7 +749,7 @@ fun BitChordPlayer(
                         .background(
                             if (shuffleOn) Color.White.copy(alpha = 0.2f) else Color.Transparent
                         )
-                        .clickable {
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                             shuffleOn = !shuffleOn
                             binder.player.shuffleModeEnabled = shuffleOn
                         },
@@ -748,7 +771,7 @@ fun BitChordPlayer(
                             if (repeatMode != Player.REPEAT_MODE_OFF) Color.White.copy(alpha = 0.2f)
                             else Color.Transparent
                         )
-                        .clickable {
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                             repeatMode = when (repeatMode) {
                                 Player.REPEAT_MODE_OFF -> Player.REPEAT_MODE_ALL
                                 Player.REPEAT_MODE_ALL -> Player.REPEAT_MODE_ONE
@@ -776,7 +799,7 @@ fun BitChordPlayer(
                             if (PlayerPreferences.trackLoopEnabled) Color.White.copy(alpha = 0.2f)
                             else Color.Transparent
                         )
-                        .clickable {
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
                             PlayerPreferences.trackLoopEnabled = !PlayerPreferences.trackLoopEnabled
                         },
                     contentAlignment = Alignment.Center
@@ -795,7 +818,7 @@ fun BitChordPlayer(
                         .size(40.dp)
                         .clip(RoundedCornerShape(50))
                         .background(Color.Transparent)
-                        .clickable { onExpandQueue() },
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onExpandQueue() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
