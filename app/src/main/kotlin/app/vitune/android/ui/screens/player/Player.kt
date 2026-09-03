@@ -652,20 +652,46 @@ fun Player(
             }
         }
 
-        if (binder != null) {
-            // Clean chevron-up button — replaces the floating Queue pill.
-            // Just a small ^ icon centered at the bottom that dismisses the
-            // now-playing sheet on tap. Matches the reference app's design.
-            IconButton(
-                icon = R.drawable.chevron_up,
-                color = colorPalette.text,
-                onClick = { playerBottomSheetState.collapseSoft() },
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 16.dp)
-                    .size(28.dp)
-            )
-        }
+        if (binder != null) Queue(
+            layoutState = playerBottomSheetState,
+            binder = binder,
+            beforeContent = {
+                if (playerLayout == PlayerPreferences.PlayerLayout.New) IconButton(
+                    onClick = { trackLoopEnabled = !trackLoopEnabled },
+                    icon = R.drawable.infinite,
+                    enabled = trackLoopEnabled,
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .size(20.dp)
+                ) else Spacer(modifier = Modifier.width(20.dp))
+            },
+            afterContent = {
+                IconButton(
+                    icon = R.drawable.ellipsis_horizontal,
+                    color = colorPalette.text,
+                    onClick = {
+                        mediaItem?.let {
+                            menuState.display {
+                                PlayerMenu(
+                                    onDismiss = menuState::hide,
+                                    mediaItem = it,
+                                    binder = binder,
+                                    onShowSpeedDialog = { audioDialogOpen = true },
+                                    onShowNormalizationDialog = {
+                                        boostDialogOpen = true
+                                    }.takeIf { volumeNormalization }
+                                )
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .padding(vertical = 8.dp)
+                        .size(20.dp)
+                )
+            },
+            modifier = Modifier.align(Alignment.BottomCenter),
+            shape = shape
+        )
       }
     }
 }
