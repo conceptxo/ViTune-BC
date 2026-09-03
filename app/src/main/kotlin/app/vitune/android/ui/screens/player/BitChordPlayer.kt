@@ -470,31 +470,37 @@ fun BitChordPlayer(
                 .padding(top = 40.dp)
                 .navigationBarsPadding()
         ) {
-            // ---- "Now Playing" header + tiny bar ----
-            // BRIGHT WHITE (was faded 50% alpha), bumped font size for visibility.
+            // ---- "Now Playing..." header + tiny bar ----
+            // BRIGHT WHITE, slightly bigger (typography.m instead of s), with "..."
             BasicText(
-                text = "Now Playing",
-                style = typography.s.semiBold.copy(
-                    color = Color.White  // ← Full bright white (was 0.5f alpha)
+                text = "Now Playing...",
+                style = typography.m.semiBold.copy(
+                    color = Color.White,
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        blurRadius = 4f,
+                        offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                    )
                 )
             )
             Spacer(modifier = Modifier.height(6.dp))
             Box(
                 modifier = Modifier
-                    .width(40.dp)
+                    .width(44.dp)
                     .height(3.dp)
                     .clip(RoundedCornerShape(1.dp))
-                    .background(Color.White.copy(alpha = 0.7f))  // ← Brighter bar
+                    .background(Color.White.copy(alpha = 0.7f))
             )
 
             Spacer(modifier = Modifier.height(16.dp))
 
             // ---- Album art (square, 10dp corners, BIG shadow, double-tap to favorite) ----
-            // Aligned to the LEFT (matches song name/artist/lyrics/volume bar alignment)
-            // so everything lines up visually.
+            // FULL WIDTH (fillMaxWidth) so the right edge aligns with the seekbar/buttons below.
+            // Height = 320dp (slightly bigger than before).
             Box(
                 modifier = Modifier
-                    .align(Alignment.Start)
+                    .fillMaxWidth()
+                    .height(320.dp)
                     .pointerInput(mediaItem.mediaId) {
                         detectTapGestures(
                             onDoubleTap = {
@@ -512,7 +518,7 @@ fun BitChordPlayer(
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(300.dp)
+                        .fillMaxSize()
                         .clip(RoundedCornerShape(10.dp))
                         .shadow(20.dp, RoundedCornerShape(10.dp))
                 )
@@ -545,7 +551,14 @@ fun BitChordPlayer(
                 Column(modifier = Modifier.weight(1f)) {
                     BasicText(
                         text = metadata.title?.toString().orEmpty(),
-                        style = typography.l.semiBold.copy(color = Color.White),
+                        style = typography.l.semiBold.copy(
+                            color = Color.White,
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black.copy(alpha = 0.6f),
+                                blurRadius = 4f,
+                                offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                            )
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.let {
@@ -554,7 +567,14 @@ fun BitChordPlayer(
                     )
                     BasicText(
                         text = metadata.artist?.toString().orEmpty(),
-                        style = typography.s.semiBold.copy(color = Color.White.copy(alpha = 0.7f)),
+                        style = typography.s.semiBold.copy(
+                            color = Color.White.copy(alpha = 0.7f),
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black.copy(alpha = 0.5f),
+                                blurRadius = 3f,
+                                offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                            )
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.let {
@@ -562,11 +582,16 @@ fun BitChordPlayer(
                         }
                     )
                 }
-                // Menu button (three dots) — opens PlayerMenu
+                // Menu button (three dots) — opens PlayerMenu (WITH circle ripple on tap)
                 Box(
                     modifier = Modifier
                         .size(36.dp)
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onOpenQueue() },
+                        .clip(RoundedCornerShape(50))
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = androidx.compose.material3.ripple(),
+                            onClick = { onOpenQueue() }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
@@ -606,7 +631,14 @@ fun BitChordPlayer(
                 ) { line ->
                     BasicText(
                         text = line,
-                        style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.7f)),
+                        style = typography.xs.semiBold.copy(
+                            color = Color.White.copy(alpha = 0.7f),
+                            shadow = androidx.compose.ui.graphics.Shadow(
+                                color = Color.Black.copy(alpha = 0.4f),
+                                blurRadius = 2f,
+                                offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                            )
+                        ),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
@@ -648,6 +680,22 @@ fun BitChordPlayer(
                     style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.6f))
                 )
             }
+
+            // ---- Song duration (below center of seekbar) ----
+            // Shows the TOTAL song duration so user can see what the actual
+            // song length is (useful when searching lyrics from LrcLib).
+            BasicText(
+                text = "Duration: ${formatTime(duration)}",
+                style = typography.xs.semiBold.copy(
+                    color = Color.White.copy(alpha = 0.5f),
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color.Black.copy(alpha = 0.4f),
+                        blurRadius = 2f,
+                        offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                    )
+                ),
+                modifier = Modifier.padding(top = 2.dp)
+            )
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -822,13 +870,17 @@ fun BitChordPlayer(
                         modifier = Modifier.size(22.dp)
                     )
                 }
-                // Queue — opens the queue sheet
+                // Queue — opens the queue sheet (WITH circle ripple on tap)
                 Box(
                     modifier = Modifier
                         .size(40.dp)
                         .clip(RoundedCornerShape(50))
                         .background(Color.Transparent)
-                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onExpandQueue() },
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = androidx.compose.material3.ripple(),
+                            onClick = { onExpandQueue() }
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
