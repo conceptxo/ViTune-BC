@@ -17,7 +17,7 @@ import androidx.compose.ui.unit.dp
  */
 object BitChordIcons {
 
-    private const val STROKE = 3.0f  // Thicker stroke (was 2.2f) — more visible icons
+    private const val STROKE = 2.2f  // Original thin stroke (reverted from 3.0f)
     private val stroke = SolidColor(Color.Black)
 
     val Play: ImageVector by lazy {
