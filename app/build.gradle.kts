@@ -76,6 +76,10 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
+            // Sign with debug key so the release APK is installable on the phone
+            // without needing a custom keystore. Gets all the performance benefits
+            // of release builds (R8 optimization, no debug overhead).
+            signingConfig = signingConfigs.getByName("debug")
         }
 
         create("nightly") {
