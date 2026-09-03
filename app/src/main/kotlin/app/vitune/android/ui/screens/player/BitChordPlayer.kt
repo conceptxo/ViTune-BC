@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -33,7 +34,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -303,42 +307,82 @@ fun BitChordPlayer(
     // --- end inline synced lyric line ---
 
     // ====================================================================
-    //  NEW BITCHORD-STYLE UI
-    //  - Full-bleed album art as background
-    //  - Vertical dark gradient overlay for legibility
-    //  - Bottom-aligned content column
-    //  - White text/icons overlaid on dim art
+    //  APPLE-MUSIC-STYLE NOW PLAYING
+    //  - Top half: crisp album art (full bleed)
+    //  - Bottom half: BLURRED album art
+    //  - Seamless blend via gradient alpha mask on crisp image's bottom edge
+    //  - Dark scrim over the blurred part for text legibility
+    //  - Controls overlaid on the blurred bottom half
     // ====================================================================
     Box(modifier = modifier.fillMaxSize()) {
-        // 1. Full-bleed album art background (subtle scale pulse on play/pause)
+        // 1. BLURRED BACKGROUND — full screen, blurred album art
+        //    blur() requires API 31+ (Android 12). On older devices, image is unblurred
+        //    (acceptable fallback — text legibility is still preserved by the scrim below).
         AsyncImage(
             model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
+                .blur(32.dp)
                 .graphicsLayer {
                     scaleX = artScale
                     scaleY = artScale
                 }
         )
 
-        // 2. Dark gradient overlay (top: 50% black, bottom: 85% black)
-        //    Makes white text legible on any album art.
+        // 2. CRISP TOP IMAGE — top 55% of screen, with seamless fade-out at bottom edge
+        //    The fade-out is achieved via drawWithContent + Brush.verticalGradient + BlendMode.DstIn.
+        //    DstIn keeps destination pixels where source alpha > 0:
+        //      - Top 80% of this image: gradient is Color.Black (alpha=1) → image fully visible
+        //      - Bottom 20% of this image: gradient fades to Transparent (alpha=0) → image fades out
+        //    As the crisp image fades out, the blurred background shows through → seamless blend.
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight(0.55f)
+                .align(Alignment.TopCenter)
+        ) {
+            AsyncImage(
+                model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .drawWithContent {
+                        drawContent()
+                        // Mask: fade out the bottom 20% of this image to transparent
+                        drawRect(
+                            brush = Brush.verticalGradient(
+                                colorStops = listOf(
+                                    0.75f to Color.Black,       // top 75%: keep image fully
+                                    1.0f to Color.Transparent   // bottom 25%: fade to transparent
+                                )
+                            ),
+                            blendMode = BlendMode.DstIn
+                        )
+                    }
+            )
+        }
+
+        // 3. DARK SCRIM on the bottom half — for text legibility on the blurred bg
+        //    Transparent at ~50% screen height → black 65% at bottom
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Black.copy(alpha = 0.5f),
-                            Color.Black.copy(alpha = 0.85f)
+                        colorStops = listOf(
+                            0.40f to Color.Transparent,
+                            0.55f to Color.Black.copy(alpha = 0.25f),
+                            0.75f to Color.Black.copy(alpha = 0.55f),
+                            1.00f to Color.Black.copy(alpha = 0.75f)
                         )
                     )
                 )
         )
 
-        // 3. Full lyrics overlay (when user taps the lyric strip)
+        // 4. Full lyrics overlay (when user taps the lyric strip)
         Lyrics(
             mediaId = mediaItem.mediaId,
             isDisplayed = isShowingLyrics,
@@ -353,7 +397,7 @@ fun BitChordPlayer(
             showControls = true
         )
 
-        // 4. Top drag-handle pill (like a bottom-sheet grabber)
+        // 5. Top drag-handle pill
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -364,7 +408,7 @@ fun BitChordPlayer(
                 .background(Color.White.copy(alpha = 0.4f))
         )
 
-        // 5. Main content column — bottom aligned
+        // 6. Main content column — bottom aligned, sits on top of blurred bg + scrim
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom,
@@ -400,7 +444,7 @@ fun BitChordPlayer(
                     )
                 }
 
-                // Heart inside a 40dp translucent circle (BITCHORD-style)
+                // Heart inside a 40dp translucent circle
                 Box(
                     modifier = Modifier
                         .size(40.dp)
@@ -426,7 +470,7 @@ fun BitChordPlayer(
 
             Spacer(modifier = Modifier.height(16.dp))
 
-            // ---- Inline lyric strip (white 70% alpha) ----
+            // ---- Inline lyric strip ----
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier
@@ -465,7 +509,7 @@ fun BitChordPlayer(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            // ---- SeekBar (unchanged) ----
+            // ---- SeekBar ----
             SeekBar(
                 binder = binder,
                 position = position,
@@ -489,7 +533,6 @@ fun BitChordPlayer(
                     modifier = Modifier.size(36.dp)
                 )
 
-                // Play/Pause — just the icon, no filled circle background (BITCHORD style)
                 Box(
                     modifier = Modifier
                         .size(64.dp)
@@ -523,7 +566,7 @@ fun BitChordPlayer(
                 verticalAlignment = Alignment.CenterVertically,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                // Shuffle (text, white when active)
+                // Shuffle
                 Box(
                     modifier = Modifier
                         .clickable {
