@@ -680,7 +680,7 @@ fun BitChordPlayer(
                         .size(44.dp)
                         .clip(RoundedCornerShape(50))
                         .background(Color.Transparent)
-                        .clickable(onOpenQueue),
+                        .clickable { onOpenQueue() },
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
