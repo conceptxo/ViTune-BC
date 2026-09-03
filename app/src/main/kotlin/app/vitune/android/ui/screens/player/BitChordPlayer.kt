@@ -45,11 +45,13 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import app.vitune.android.R
 import app.vitune.android.Database
 import app.vitune.android.models.Lyrics as LyricsData
 import app.vitune.android.models.ui.toUiMedia
@@ -117,6 +119,7 @@ fun BitChordPlayer(
     onTitleClick: (() -> Unit)? = null,
     onArtistClick: (() -> Unit)? = null,
     onOpenLyricsDialog: () -> Unit = {},
+    onExpandQueue: () -> Unit = {},  // NEW: opens the queue sheet (chevron-up arrow)
     modifier: Modifier = Modifier
 ) {
     val (colorPalette, typography) = LocalAppearance.current
@@ -351,16 +354,18 @@ fun BitChordPlayer(
         )
 
         // 2. CRISP ALBUM ART — horizontal rectangle, ContentScale.Fit (NO CROPPING)
-        //    Size: full width × 350dp height (bigger, fills more screen)
-        //    Position: top-center, 24dp from the top
-        //    Bottom edge fades from opaque to transparent over the bottom 40%
-        //    of its height → seamless blend with the blurred background below.
+        //    Size: full width × 420dp height (bigger, fills more screen)
+        //    Position: top-center, 16dp from the top
+        //    NO dark gradient on the art itself — the user explicitly asked
+        //    to remove it. The art shows in its original colors.
+        //    Bottom edge fades to transparent (alpha mask) so it blends
+        //    seamlessly with the blurred background below.
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 24.dp)
+                .padding(top = 16.dp)
                 .fillMaxWidth()
-                .height(350.dp)
+                .height(420.dp)
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
@@ -374,14 +379,16 @@ fun BitChordPlayer(
                     .clip(RoundedCornerShape(16.dp))
                     .drawWithContent {
                         drawContent()
-                        // Alpha mask: full opacity until 60% of image height,
+                        // Alpha mask: full opacity until 70% of image height,
                         // then fade gradually to transparent at 100%.
-                        // This 40% wide fade zone creates the seamless blend.
+                        // This 30% fade zone creates the seamless blend with blur.
+                        // NOTE: This is an ALPHA mask (BlendMode.DstIn), NOT a
+                        // black gradient overlay — the art's colors are preserved.
                         drawRect(
                             brush = Brush.verticalGradient(
                                 colorStops = arrayOf(
                                     0.00f to Color.Black,
-                                    0.60f to Color.Black,
+                                    0.70f to Color.Black,
                                     1.00f to Color.Transparent
                                 )
                             ),
@@ -628,9 +635,29 @@ fun BitChordPlayer(
                 }
             }
 
-            Spacer(modifier = Modifier.height(24.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // ---- Secondary row: Shuffle / Repeat / Loop / Queue (all as icons) ----
+            // ---- Chevron-up arrow button — opens the queue sheet ----
+            // Placed BETWEEN the playback controls and the 4-icon row,
+            // exactly like the reference app (BITCHORD).
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(RoundedCornerShape(50))
+                    .clickable { onExpandQueue() },
+                contentAlignment = Alignment.Center
+            ) {
+                Image(
+                    painter = painterResource(R.drawable.chevron_up),
+                    contentDescription = "Open Queue",
+                    colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.7f)),
+                    modifier = Modifier.size(24.dp)
+                )
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ---- Secondary row: Shuffle / Repeat / Loop / Menu (all as icons) ----
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
