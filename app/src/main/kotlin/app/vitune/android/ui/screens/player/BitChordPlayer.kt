@@ -6,15 +6,11 @@ import android.database.ContentObserver
 import android.os.Handler
 import android.os.Looper
 import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -476,20 +472,20 @@ fun BitChordPlayer(
                         .clip(RoundedCornerShape(10.dp))
                         .shadow(12.dp, RoundedCornerShape(10.dp))
                 )
-                // Heart pop animation on double-tap
-                AnimatedVisibility(
-                    visible = showHeartPop,
-                    enter = scaleIn(spring(dampingRatio = Spring.DampingRatioMediumBouncy)) + fadeIn(),
-                    exit = scaleOut(tween(400)) + fadeOut(tween(400)),
-                    modifier = Modifier.align(Alignment.Center)
-                ) {
+                // Heart pop animation on double-tap.
+                // Simpler approach: just show the heart when showHeartPop is true.
+                // The pop effect comes from the showHeartPop LaunchedEffect delay
+                // (in the main composable body) which sets it back to false after 800ms.
+                if (showHeartPop) {
                     Image(
                         imageVector = BitChordIcons.HeartFilled,
                         contentDescription = null,
                         colorFilter = ColorFilter.tint(
                             if (likedAt != null) colorPalette.favoritesIcon else Color.White
                         ),
-                        modifier = Modifier.size(80.dp)
+                        modifier = Modifier
+                            .align(Alignment.Center)
+                            .size(80.dp)
                     )
                 }
             }
