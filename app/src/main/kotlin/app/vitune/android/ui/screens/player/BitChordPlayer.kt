@@ -376,20 +376,31 @@ fun BitChordPlayer(
     //  - Volume bar
     //  - Shuffle/Repeat/Loop/Queue row at bottom
     // ====================================================================
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 1. GRADIENT BACKGROUND from album art colors
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(Color.Black)  // Opaque black base — NOTHING shows through
+    ) {
+        // 1. GRADIENT BACKGROUND from album art colors (VIBRANT — full opacity)
+        //    Uses the two most-dominant colors from the album art as a
+        //    vertical gradient. Both colors are at full alpha (1.0) so the
+        //    background is fully opaque — no transparency, no bleed-through.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colors = bgColors.take(2).let { (a, b) ->
-                            listOf(a, b, b.copy(alpha = 0.8f))
+                            listOf(
+                                a,                   // top: dominant color (full opacity)
+                                b,                   // middle: second color (full opacity)
+                                b.copy(alpha = 1.0f)  // bottom: same as middle, full opacity
+                            )
                         }
                     )
                 )
         )
-        // 1b. Dark overlay at bottom for text legibility
+        // 1b. Dark overlay at bottom for text legibility (gentler than before
+        //     so the vibrant colors show through more)
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -397,9 +408,10 @@ fun BitChordPlayer(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
                             0.00f to Color.Black.copy(alpha = 0.00f),
-                            0.50f to Color.Black.copy(alpha = 0.10f),
-                            0.75f to Color.Black.copy(alpha = 0.45f),
-                            1.00f to Color.Black.copy(alpha = 0.80f)
+                            0.50f to Color.Black.copy(alpha = 0.00f),
+                            0.70f to Color.Black.copy(alpha = 0.20f),
+                            0.85f to Color.Black.copy(alpha = 0.50f),
+                            1.00f to Color.Black.copy(alpha = 0.75f)
                         )
                     )
                 )
@@ -427,30 +439,34 @@ fun BitChordPlayer(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .padding(top = 16.dp)
+                .padding(top = 40.dp)
                 .navigationBarsPadding()
         ) {
             // ---- "Now Playing" header + tiny bar ----
+            // BRIGHT WHITE (was faded 50% alpha), bumped font size for visibility.
             BasicText(
                 text = "Now Playing",
-                style = typography.xs.semiBold.copy(
-                    color = Color.White.copy(alpha = 0.5f)
+                style = typography.s.semiBold.copy(
+                    color = Color.White  // ← Full bright white (was 0.5f alpha)
                 )
             )
-            Spacer(modifier = Modifier.height(4.dp))
+            Spacer(modifier = Modifier.height(6.dp))
             Box(
                 modifier = Modifier
-                    .width(32.dp)
-                    .height(2.dp)
+                    .width(40.dp)
+                    .height(3.dp)
                     .clip(RoundedCornerShape(1.dp))
-                    .background(Color.White.copy(alpha = 0.3f))
+                    .background(Color.White.copy(alpha = 0.7f))  // ← Brighter bar
             )
 
-            Spacer(modifier = Modifier.height(12.dp))
+            Spacer(modifier = Modifier.height(16.dp))
 
-            // ---- Album art (square, 10dp corners, shadow, double-tap to favorite) ----
+            // ---- Album art (square, 10dp corners, BIG shadow, double-tap to favorite) ----
+            // Aligned to the LEFT (matches song name/artist/lyrics/volume bar alignment)
+            // so everything lines up visually.
             Box(
                 modifier = Modifier
+                    .align(Alignment.Start)
                     .pointerInput(mediaItem.mediaId) {
                         detectTapGestures(
                             onDoubleTap = {
@@ -468,9 +484,9 @@ fun BitChordPlayer(
                     contentDescription = null,
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
-                        .size(280.dp)
+                        .size(300.dp)
                         .clip(RoundedCornerShape(10.dp))
-                        .shadow(12.dp, RoundedCornerShape(10.dp))
+                        .shadow(20.dp, RoundedCornerShape(10.dp))
                 )
                 // Heart pop animation on double-tap.
                 // Simpler approach: just show the heart when showHeartPop is true.
