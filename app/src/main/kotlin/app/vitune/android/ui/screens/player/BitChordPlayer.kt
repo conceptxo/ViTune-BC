@@ -332,7 +332,11 @@ fun BitChordPlayer(
     //  Layer 3: MULTI-STOP DARK GRADIENT over the bottom half
     //           - Text legibility on top of the blurred bg
     //  ====================================================================
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(modifier = Modifier
+        .fillMaxSize()
+        .background(Color.Black)  // Solid black base — prevents system wallpaper
+                                   // from showing through during image transitions
+    ) {
         // 1. BLURRED FULL-SCREEN BACKGROUND
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
@@ -347,16 +351,16 @@ fun BitChordPlayer(
         )
 
         // 2. CRISP ALBUM ART — horizontal rectangle, ContentScale.Fit (NO CROPPING)
-        //    Size: full width × 240dp height
-        //    Position: top-center, 32dp from the top
+        //    Size: full width × 350dp height (bigger, fills more screen)
+        //    Position: top-center, 24dp from the top
         //    Bottom edge fades from opaque to transparent over the bottom 40%
         //    of its height → seamless blend with the blurred background below.
         Box(
             modifier = Modifier
                 .align(Alignment.TopCenter)
-                .padding(top = 32.dp)
+                .padding(top = 24.dp)
                 .fillMaxWidth()
-                .height(240.dp)
+                .height(350.dp)
         ) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
