@@ -312,76 +312,54 @@ fun BitChordPlayer(
                       else 0f
 
     // ====================================================================
-    //  APPLE-MUSIC-STYLE NOW PLAYING
-    //  Ignores the incoming `modifier` so the parent's padding (top = 54.dp
-    //  and vertical = 8.dp from Player.kt) does NOT shrink this Box.
-    //  We use Modifier.fillMaxSize() with NO incoming modifier, so the album
-    //  art truly fills the entire screen edge-to-edge (YumaPlayer-style).
+    //  APPLE-MUSIC-STYLE NOW PLAYING (YumaPlayer-style seamless blend)
+    //
+    //  THE BIG INSIGHT: We do NOT use two separate images (crisp + blurred).
+    //  Two stacked images ALWAYS produce a visible seam, no matter how wide
+    //  the alpha mask is, because the blur radius abruptly changes at the
+    //  boundary.
+    //
+    //  Instead, we use ONE single full-screen image, and overlay a multi-stop
+    //  dark gradient on top of it. The gradient darkens the bottom 60% of the
+    //  screen heavily (so text is readable), while the top 40% stays nearly
+    //  transparent (so the crisp art shows through).
+    //
+    //  Result: NO seam, NO blur transition, NO two-image misalignment.
+    //  The crisp album art bleeds smoothly into a darkened version of itself,
+    //  exactly like YumaPlayer and Apple Music do it.
     // ====================================================================
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. BLURRED BACKGROUND — full screen, blurred album art.
-        //    No graphicsLayer/scale animation: keeps the backdrop perfectly still
-        //    (matches BITCHORD — the background doesn't pulse on play/pause).
+        // 1. SINGLE FULL-SCREEN ALBUM ART — crisp, no blur, no scaling.
+        //    This is the only image layer. It covers the entire screen.
         AsyncImage(
             model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(48.dp)
+            modifier = Modifier.fillMaxSize()
         )
 
-        // 2. CRISP TOP IMAGE — top 50% of screen, fades out smoothly into the
-        //    blurred background below. The fade is spread over the ENTIRE image
-        //    (0.0 -> 1.0) so there is absolutely NO hard seam — the transition
-        //    is imperceptible (Apple Music style).
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(0.50f)
-                .align(Alignment.TopCenter)
-        ) {
-            AsyncImage(
-                model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .drawWithContent {
-                        drawContent()
-                        // Full-range alpha mask: keep full opacity until 40% of
-                        // image height, then fade gradually to transparent at 100%.
-                        // 60% of the image height is the fade zone — that wide
-                        // spread is what kills the hard seam.
-                        drawRect(
-                            brush = Brush.verticalGradient(
-                                colorStops = arrayOf(
-                                    0.00f to Color.Black,
-                                    0.40f to Color.Black,
-                                    1.00f to Color.Transparent
-                                )
-                            ),
-                            blendMode = BlendMode.DstIn
-                        )
-                    }
-            )
-        }
-
-        // 3. DARK SCRIM (multi-stop, very gentle) — for text legibility on the
-        //    blurred bg. Distributes darkening across the whole height so no
-        //    hard transition line is visible.
+        // 2. MULTI-STOP DARK GRADIENT — the magic layer.
+        //    Top 35%: nearly transparent (crisp art visible).
+        //    35% → 60%: gradual darkening (art still visible but dimmer).
+        //    60% → 100%: heavily darkened (controls readable on top).
+        //
+        //    The darkening IS the "blend" — by gradually covering the album
+        //    art with black, we create a smooth visual fade from "crisp art"
+        //    at top to "dark backdrop" at bottom. No seam possible because
+        //    there's only one image underneath.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
-                            0.00f to Color.Black.copy(alpha = 0.05f),
-                            0.20f to Color.Black.copy(alpha = 0.10f),
-                            0.40f to Color.Black.copy(alpha = 0.30f),
-                            0.60f to Color.Black.copy(alpha = 0.55f),
-                            0.85f to Color.Black.copy(alpha = 0.85f),
-                            1.00f to Color.Black.copy(alpha = 0.95f)
+                            0.00f to Color.Black.copy(alpha = 0.00f),
+                            0.30f to Color.Black.copy(alpha = 0.05f),
+                            0.45f to Color.Black.copy(alpha = 0.30f),
+                            0.55f to Color.Black.copy(alpha = 0.55f),
+                            0.70f to Color.Black.copy(alpha = 0.80f),
+                            0.85f to Color.Black.copy(alpha = 0.92f),
+                            1.00f to Color.Black.copy(alpha = 0.97f)
                         )
                     )
                 )
