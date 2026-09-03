@@ -120,12 +120,10 @@ fun BitChordPlayer(
     val metadata = mediaItem.mediaMetadata
     val media = remember(mediaItem, duration) { mediaItem.toUiMedia(duration) }
 
-    // Subtle scale pulse on the background album art when play/pause toggles
-    val artScale by animateFloatAsState(
-        targetValue = if (shouldBePlaying) 1f else 0.96f,
-        animationSpec = spring(dampingRatio = Spring.DampingRatioLowBouncy),
-        label = "artScale"
-    )
+    // NOTE: Removed the scale pulse on play/pause — it was causing the blurred
+    // background to visibly shrink/expand, which looked jarring. The album art
+    // now stays perfectly still whether playing or paused, which matches
+    // BITCHORD's behavior (where the album art is a static backdrop).
 
     var shuffleOn by remember { mutableStateOf(binder.player.shuffleModeEnabled) }
     var repeatMode by remember { mutableStateOf(binder.player.repeatMode) }
@@ -263,6 +261,7 @@ fun BitChordPlayer(
             offset = file?.offset?.inWholeMilliseconds ?: 0L
         )
     }
+
     val synchronizedLyrics = remember(lyricsState) {
         lyricsState.sentences?.let {
             SynchronizedLyrics(it.toImmutableMap()) {
@@ -314,29 +313,32 @@ fun BitChordPlayer(
 
     // ====================================================================
     //  APPLE-MUSIC-STYLE NOW PLAYING
+    //  Ignores the incoming `modifier` so the parent's padding (top = 54.dp
+    //  and vertical = 8.dp from Player.kt) does NOT shrink this Box.
+    //  We use Modifier.fillMaxSize() with NO incoming modifier, so the album
+    //  art truly fills the entire screen edge-to-edge (YumaPlayer-style).
     // ====================================================================
     Box(modifier = Modifier.fillMaxSize()) {
-        // 1. BLURRED BACKGROUND — full screen, blurred album art
+        // 1. BLURRED BACKGROUND — full screen, blurred album art.
+        //    No graphicsLayer/scale animation: keeps the backdrop perfectly still
+        //    (matches BITCHORD — the background doesn't pulse on play/pause).
         AsyncImage(
             model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .blur(32.dp)
-                .graphicsLayer {
-                    scaleX = artScale
-                    scaleY = artScale
-                }
+                .blur(48.dp)
         )
 
-        // 2. CRISP TOP IMAGE — top 60% of screen, fades out smoothly into the
-        //    blurred background below. Fade is spread over a wide range (50%->80%
-        //    of image height) so there is NO hard seam.
+        // 2. CRISP TOP IMAGE — top 50% of screen, fades out smoothly into the
+        //    blurred background below. The fade is spread over the ENTIRE image
+        //    (0.0 -> 1.0) so there is absolutely NO hard seam — the transition
+        //    is imperceptible (Apple Music style).
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .fillMaxHeight(0.60f)
+                .fillMaxHeight(0.50f)
                 .align(Alignment.TopCenter)
         ) {
             AsyncImage(
@@ -347,14 +349,15 @@ fun BitChordPlayer(
                     .fillMaxSize()
                     .drawWithContent {
                         drawContent()
-                        // Long, gentle alpha mask: keep full opacity until 50% of
+                        // Full-range alpha mask: keep full opacity until 40% of
                         // image height, then fade gradually to transparent at 100%.
-                        // This 50% wide fade range is what makes the blend seamless.
+                        // 60% of the image height is the fade zone — that wide
+                        // spread is what kills the hard seam.
                         drawRect(
                             brush = Brush.verticalGradient(
                                 colorStops = arrayOf(
                                     0.00f to Color.Black,
-                                    0.50f to Color.Black,
+                                    0.40f to Color.Black,
                                     1.00f to Color.Transparent
                                 )
                             ),
@@ -365,20 +368,20 @@ fun BitChordPlayer(
         }
 
         // 3. DARK SCRIM (multi-stop, very gentle) — for text legibility on the
-        //    blurred bg. Starts nearly transparent at 30%, reaches full 75% black
-        //    at the very bottom. Distributes darkening across the whole height
-        //    so no hard transition line is visible.
+        //    blurred bg. Distributes darkening across the whole height so no
+        //    hard transition line is visible.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
-                            0.00f to Color.Black.copy(alpha = 0.10f),
-                            0.30f to Color.Black.copy(alpha = 0.15f),
-                            0.50f to Color.Black.copy(alpha = 0.35f),
-                            0.70f to Color.Black.copy(alpha = 0.55f),
-                            1.00f to Color.Black.copy(alpha = 0.80f)
+                            0.00f to Color.Black.copy(alpha = 0.05f),
+                            0.20f to Color.Black.copy(alpha = 0.10f),
+                            0.40f to Color.Black.copy(alpha = 0.30f),
+                            0.60f to Color.Black.copy(alpha = 0.55f),
+                            0.85f to Color.Black.copy(alpha = 0.85f),
+                            1.00f to Color.Black.copy(alpha = 0.95f)
                         )
                     )
                 )
@@ -413,13 +416,17 @@ fun BitChordPlayer(
         )
 
         // 6. Main content column — bottom aligned, sits on top of blurred bg + scrim
+        //    IMPORTANT: bottom padding is 96.dp so the action buttons
+        //    (Shuffle/Repeat/Loop/Menu) sit ABOVE the floating Queue pill,
+        //    not behind it. The Queue pill (~72dp tall) lives at the very bottom
+        //    of the screen via Player.kt's BottomSheet, so we leave room for it.
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Bottom,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(horizontal = 24.dp)
-                .padding(top = 40.dp, bottom = 32.dp)
+                .padding(top = 40.dp, bottom = 96.dp)
         ) {
             // ---- Title + Artist + Heart row ----
             Row(
@@ -447,6 +454,7 @@ fun BitChordPlayer(
                         }
                     )
                 }
+
                 // Heart inside a 40dp translucent circle
                 Box(
                     modifier = Modifier
@@ -566,9 +574,10 @@ fun BitChordPlayer(
 
                 // Play/Pause — large icon, no filled circle background
                 // Uses BitChordIcons directly with white tint so it shows on blurred bg
+                // Bumped from 48dp to 64dp so the icon is prominent (BITCHORD style).
                 Box(
                     modifier = Modifier
-                        .size(72.dp)
+                        .size(96.dp)
                         .clickable {
                             if (shouldBePlaying) binder.player.pause() else {
                                 if (binder.player.playbackState == Player.STATE_IDLE) binder.player.prepare()
@@ -582,7 +591,7 @@ fun BitChordPlayer(
                                        else BitChordIcons.Play,
                         contentDescription = if (shouldBePlaying) "Pause" else "Play",
                         tint = Color.White,
-                        modifier = Modifier.size(48.dp)
+                        modifier = Modifier.size(64.dp)
                     )
                 }
 
@@ -600,9 +609,10 @@ fun BitChordPlayer(
                     )
                 }
             }
+
             Spacer(modifier = Modifier.height(24.dp))
 
-            // ---- Secondary row: Shuffle / Repeat / Loop / Menu (all as icons) ----
+            // ---- Secondary row: Shuffle / Repeat / Loop / Queue (all as icons) ----
             Row(
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically,
