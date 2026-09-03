@@ -224,9 +224,8 @@ collapsedContent = { innerModifier ->
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontalBottomPaddingValues)
-                    .padding(bottom = 60.dp),  // Moved up away from home button
-                contentAlignment = Alignment.BottomCenter
+                    .padding(horizontalBottomPaddingValues),
+                contentAlignment = Alignment.Center
             ) {
                 // Clean chevron-up button — replaces the old "Queue" pill.
                 // Tapping it expands the queue sheet (default BottomSheet behavior).
@@ -237,9 +236,7 @@ collapsedContent = { innerModifier ->
                     colorFilter = ColorFilter.tint(colorPalette.text),
                     modifier = Modifier
                         .then(innerModifier)
-                        .size(32.dp)
-                        .clip(RoundedCornerShape(50))
-                        .padding(4.dp)
+                        .size(28.dp)
                 )
             }
 }
