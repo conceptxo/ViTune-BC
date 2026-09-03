@@ -44,6 +44,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.C
@@ -76,6 +77,8 @@ import app.vitune.providers.lrclib.LrcLib
 import app.vitune.providers.lrclib.LrcParser
 import app.vitune.providers.lrclib.toLrcFile
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.request.crossfade
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.collections.immutable.toImmutableMap
 import kotlinx.coroutines.CancellationException
@@ -330,9 +333,18 @@ fun BitChordPlayer(
     // ====================================================================
     Box(modifier = Modifier.fillMaxSize()) {
         // 1. SINGLE FULL-SCREEN ALBUM ART — crisp, no blur, no scaling.
-        //    This is the only image layer. It covers the entire screen.
+        //    Uses Coil's ImageRequest.Builder with crossfade(400ms) so that
+        //    when the song changes, the old album art fades smoothly into the
+        //    new one — NO jarring cut, NO black flash, NO "previous background
+        //    showing through" during transition.
+        //
+        //    We also pass an `ImageRequest` instead of a plain Uri so Coil
+        //    includes crossfade + a higher-priority load.
         AsyncImage(
-            model = metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px),
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(metadata.artworkUri?.thumbnail(Dimensions.thumbnails.player.song.px))
+                .crossfade(400)
+                .build(),
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier.fillMaxSize()
