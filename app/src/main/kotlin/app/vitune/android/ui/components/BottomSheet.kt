@@ -63,9 +63,13 @@ fun BottomSheet(
         // Only enable the drag gesture pointerInput when the sheet is NOT fully
         // dismissed. We check against dismissedBound (NOT collapsedBound) so the
         // drag continues working even as the sheet transitions through the
-        // collapsed state on its way down. This fixes the "slow swipe down" bug
-        // where the drag was getting interrupted mid-gesture.
-        .pointerInput(state, state.value) {
+        // collapsed state on its way down.
+        //
+        // CRITICAL: Use only `state` as the pointerInput key — NOT `state.value`.
+        // Using state.value as a key would restart the pointerInput on every
+        // drag movement (since value changes during drag), which cancels the
+        // gesture constantly and makes swipe-down feel "stuck".
+        .pointerInput(state) {
             if (state.value <= state.dismissedBound) return@pointerInput
             val velocityTracker = VelocityTracker()
 
