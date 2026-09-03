@@ -128,6 +128,14 @@ private val FallbackColors = listOf(
     Color(0xFF533483)
 )
 
+// Neutral "loading" colors — what BITCHORD uses while the new song's palette
+// is being extracted. These are dark grey tones, NOT blue, so there's no
+// jarring blue flash when switching songs.
+private val LoadingColors = listOf(
+    Color(0xFF2A2A2A),  // Dark neutral grey (top)
+    Color(0xFF1A1A1A)   // Darker neutral grey (bottom)
+)
+
 @Composable
 fun BitChordPlayer(
     mediaItem: MediaItem,
@@ -152,13 +160,17 @@ fun BitChordPlayer(
     val media = remember(mediaItem, duration) { mediaItem.toUiMedia(duration) }
 
     // --- Extract colors from album art for the gradient background ---
-    // IMPORTANT: Do NOT key on mediaItem.mediaId — that would reset to
-    // FallbackColors (blue) on every song change, causing a blue flash.
-    // Instead, use remember without a key so the PREVIOUS song's colors
-    // persist until the new ones are extracted. Then animateColorAsState
-    // below smoothly crossfades from old → new colors.
-    var bgColors by remember { mutableStateOf(FallbackColors) }
+    // BITCHORD-STYLE color transition:
+    // 1. On song change: IMMEDIATELY snap bgColors to LoadingColors (dark grey)
+    // 2. Once new palette is extracted: bgColors updates to the new colors
+    // 3. animateColorAsState (below) smoothly crossfades from old → new
+    //
+    // This gives the "snap to neutral, then fade to new color" effect
+    // exactly like BITCHORD. No blue flash, no jarring rainbow.
+    var bgColors by remember { mutableStateOf(LoadingColors) }
     LaunchedEffect(mediaItem.mediaId) {
+        // Snap to neutral loading colors IMMEDIATELY on song change
+        bgColors = LoadingColors
         val artworkUri = metadata.artworkUri?.toString()
         if (artworkUri != null) {
             withContext(Dispatchers.IO) {
@@ -188,18 +200,17 @@ fun BitChordPlayer(
         }
     }
 
-    // --- Smooth gradient color crossfade (800ms tween) ---
-    // When bgColors changes (new song's palette extracted), the gradient
-    // smoothly crossfades from the OLD colors to the NEW colors over 800ms.
-    // No more jarring cut from red → blue → yellow.
+    // --- Smooth gradient color crossfade (400ms — matches BITCHORD's timing) ---
+    // When bgColors changes, the gradient smoothly crossfades over 400ms.
+    // This is the "fade to new color" phase after the snap to loading colors.
     val animatedTopColor by animateColorAsState(
-        targetValue = bgColors.getOrElse(0) { FallbackColors[0] },
-        animationSpec = tween(durationMillis = 800),
+        targetValue = bgColors.getOrElse(0) { LoadingColors[0] },
+        animationSpec = tween(durationMillis = 400),
         label = "gradientTop"
     )
     val animatedBottomColor by animateColorAsState(
-        targetValue = bgColors.getOrElse(1) { FallbackColors[1] },
-        animationSpec = tween(durationMillis = 800),
+        targetValue = bgColors.getOrElse(1) { LoadingColors[1] },
+        animationSpec = tween(durationMillis = 400),
         label = "gradientBottom"
     )
 
