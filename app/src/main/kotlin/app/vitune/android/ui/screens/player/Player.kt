@@ -435,7 +435,7 @@ fun Player(
         if (isShowingLyricsDialog) LyricsDialog(onDismiss = { isShowingLyricsDialog = false })
 
         val playerBottomSheetState = rememberBottomSheetState(
-            dismissedBound = 72.dp + horizontalBottomPaddingValues.calculateBottomPadding(),
+            dismissedBound = 0.dp,
             expandedBound = layoutState.expandedBound
         )
                 val containerModifier = Modifier
