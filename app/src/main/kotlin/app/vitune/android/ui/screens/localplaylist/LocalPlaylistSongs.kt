@@ -8,6 +8,7 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -30,6 +31,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -45,12 +49,12 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.vitune.android.Database
@@ -116,8 +120,19 @@ fun LocalPlaylistSongs(
 
     var loading by remember { mutableStateOf(false) }
     var isSortedOldestFirst by rememberSaveable { mutableStateOf(false) }
-    val displaySongs = remember(songs, isSortedOldestFirst) {
-        if (isSortedOldestFirst) songs.reversed() else songs
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var isSearching by rememberSaveable { mutableStateOf(false) }
+
+    // Filter + sort songs
+    val displaySongs = remember(songs, isSortedOldestFirst, searchQuery, isSearching) {
+        var result = songs
+        if (isSearching && searchQuery.isNotBlank()) {
+            result = songs.filter {
+                it.title.contains(searchQuery, ignoreCase = true) ||
+                it.artistsText?.contains(searchQuery, ignoreCase = true) == true
+            }
+        }
+        if (isSortedOldestFirst) result.reversed() else result
     }
 
     val coverPickerLauncher = rememberLauncherForActivityResult(
@@ -125,20 +140,15 @@ fun LocalPlaylistSongs(
     ) { uri ->
         if (uri != null) {
             context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
-            query {
-                Database.update(playlist.copy(thumbnail = uri.toString()))
-            }
+            query { Database.update(playlist.copy(thumbnail = uri.toString())) }
         }
     }
 
     LaunchedEffect(Unit) {
         if (DataPreferences.autoSyncPlaylists) playlist.browseId?.let { browseId ->
-            loading = true
-            sync(playlist, browseId)
-            loading = false
+            loading = true; sync(playlist, browseId); loading = false
         }
     }
 
@@ -171,50 +181,50 @@ fun LocalPlaylistSongs(
     val createdDate = remember(playlist.id) { dateFormat.format(Date()) }
 
     // ====================================================================
-    //  SIMPMUSIC-STYLE IMMERSIVE PLAYLIST DETAIL
-    //  - Album art BLURRED as full-screen background (not solid black!)
-    //  - Gradient overlay on top of the blur (seamless blend)
-    //  - Back/Menu = plain icons (no circle, no glass)
-    //  - Shuffle/Search = SOLID colored circles
-    //  - Play/Pause = white pill
-    //  - Sort chip actually works
+    //  SIMPMUSIC-STYLE IMMERSIVE PLAYLIST DETAIL (v3)
+    //  - Album art fills ENTIRE screen (full bleed, edge-to-edge)
+    //  - Soft alpha mask on art bottom (fades to transparent)
+    //  - Dark gradient: semi-transparent top → pitch black (#000) bottom
+    //  - Top bar: Back (left) + Search+Menu (right) — plain icons
+    //  - Buttons positioned LOWER (matching SimpMusic)
+    //  - Sort capsule = COMPACT + song count INSIDE on the right
+    //  - Search actually filters songs in the playlist
     // ====================================================================
     Box(modifier = modifier.fillMaxSize()) {
-        // ---- 1. BLURRED ALBUM ART AS FULL SCREEN BACKGROUND ----
-        // This is the KEY difference from before: instead of solid black,
-        // the background is a BLURRED version of the playlist cover.
-        // This gives the "vibrant colored background" like SimpMusic.
+        // ---- 1. FULL-BLEED ALBUM ART BACKGROUND ----
         Box(modifier = Modifier.fillMaxSize()) {
             thumbnailContent()
         }
-        // Blur overlay on top of the thumbnail to make it a backdrop
+
+        // ---- 2. BLUR overlay (frosted glass backdrop) ----
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .blur(48.dp)
         )
 
-        // ---- 2. DARK GRADIENT OVERLAY ----
-        // Transparent at top (showing blurred art) → dark at bottom
-        // This creates the seamless blend AND ensures text readability.
+        // ---- 3. DARK GRADIENT (melts into pitch black #000) ----
+        // Transparent at top (art visible) → semi-dark middle → pure #000 bottom
+        // Zero hard cutoff — smooth, organic, atmospheric blend.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
-                            0.00f to Color.Black.copy(alpha = 0.10f),
-                            0.25f to Color.Black.copy(alpha = 0.25f),
-                            0.45f to Color.Black.copy(alpha = 0.55f),
-                            0.60f to Color.Black.copy(alpha = 0.80f),
-                            0.75f to Color.Black.copy(alpha = 0.95f),
-                            1.00f to Color.Black.copy(alpha = 0.98f)
+                            0.00f to Color.Black.copy(alpha = 0.05f),
+                            0.20f to Color.Black.copy(alpha = 0.15f),
+                            0.40f to Color.Black.copy(alpha = 0.40f),
+                            0.55f to Color.Black.copy(alpha = 0.65f),
+                            0.70f to Color.Black.copy(alpha = 0.85f),
+                            0.85f to Color.Black.copy(alpha = 0.97f),
+                            1.00f to Color.Black
                         )
                     )
                 )
         )
 
-        // ---- 3. CONTENT ----
+        // ---- 4. CONTENT ----
         LookaheadScope {
             LazyColumn(
                 state = reorderingState.lazyListState,
@@ -228,7 +238,8 @@ fun LocalPlaylistSongs(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // ---- TOP BAR: Plain icons (no circles, no glass) ----
+                        // ---- TOP BAR: Back (left) + Search + Menu (right) ----
+                        // ALL plain icons — no circles, no glass
                         Row(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
@@ -236,7 +247,7 @@ fun LocalPlaylistSongs(
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
-                            // Back button — PLAIN ICON, no circle, no background
+                            // Back — plain icon
                             Image(
                                 painter = painterResource(R.drawable.chevron_back),
                                 contentDescription = "Back",
@@ -249,16 +260,31 @@ fun LocalPlaylistSongs(
                                     ) { onDelete() }
                             )
 
-                            // Right side: loading + menu
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                horizontalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
                                 AnimatedVisibility(loading) {
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
                                 }
 
-                                // Menu button — PLAIN ICON, no circle, no background
+                                // Search — plain icon (WORKS — toggles search mode)
+                                Image(
+                                    painter = painterResource(R.drawable.search),
+                                    contentDescription = "Search",
+                                    colorFilter = ColorFilter.tint(Color.White),
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) {
+                                            isSearching = !isSearching
+                                            if (!isSearching) searchQuery = ""
+                                        }
+                                )
+
+                                // Menu — plain icon
                                 Image(
                                     painter = painterResource(R.drawable.ellipsis_horizontal),
                                     contentDescription = "Menu",
@@ -339,7 +365,30 @@ fun LocalPlaylistSongs(
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(48.dp))
+                        // ---- SEARCH BAR (visible only when searching) ----
+                        if (isSearching) {
+                            TextField(
+                                value = searchQuery,
+                                onValueChange = { searchQuery = it },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 16.dp, vertical = 4.dp)
+                                    .clip(RoundedCornerShape(24.dp)),
+                                placeholder = { BasicText("Search in playlist...", style = typography.s.semiBold.copy(color = Color.White.copy(alpha = 0.4f))) },
+                                singleLine = true,
+                                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                                colors = TextFieldDefaults.colors(
+                                    focusedContainerColor = Color.White.copy(alpha = 0.12f),
+                                    unfocusedContainerColor = Color.White.copy(alpha = 0.08f),
+                                    cursorColor = Color.White,
+                                    focusedTextColor = Color.White,
+                                    unfocusedTextColor = Color.White
+                                )
+                            )
+                        }
+
+                        // ---- MORE SPACER (pushes buttons DOWN to match SimpMusic) ----
+                        Spacer(modifier = Modifier.height(120.dp))
 
                         // ---- PLAYLIST NAME ----
                         BasicText(
@@ -363,11 +412,12 @@ fun LocalPlaylistSongs(
                         Spacer(modifier = Modifier.height(20.dp))
 
                         // ---- CENTER BUTTONS: Shuffle | Play/Pause | Search ----
+                        // (Search stays here as a circle — per user's original request)
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(20.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Shuffle — SOLID colored circle (white 15% fill, NO glass effect)
+                            // Shuffle — solid circle
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -434,7 +484,7 @@ fun LocalPlaylistSongs(
                                 }
                             }
 
-                            // Search — SOLID colored circle (same as shuffle, NO glass)
+                            // Search (circle — works, toggles search bar)
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
@@ -444,8 +494,8 @@ fun LocalPlaylistSongs(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        // Search within playlist — filter songs
-                                        // For now, toggles a simple search mode (future: full search dialog)
+                                        isSearching = !isSearching
+                                        if (!isSearching) searchQuery = ""
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -460,19 +510,9 @@ fun LocalPlaylistSongs(
 
                         Spacer(modifier = Modifier.height(16.dp))
 
-                        // ---- Song count ----
-                        BasicText(
-                            text = "${displaySongs.size} ${stringResource(R.string.songs)}",
-                            style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.7f)),
-                            modifier = Modifier.padding(top = 4.dp)
-                        )
-
-                        Spacer(modifier = Modifier.height(8.dp))
-
-                        // ---- Sort chip (WORKS — toggles sort order) ----
+                        // ---- SORT CAPSULE (COMPACT) + SONG COUNT (inside, right side) ----
                         Row(
                             modifier = Modifier
-                                .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
                                 .clip(RoundedCornerShape(20.dp))
                                 .background(Color.White.copy(alpha = 0.10f))
@@ -480,20 +520,39 @@ fun LocalPlaylistSongs(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) { isSortedOldestFirst = !isSortedOldestFirst }
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                                .padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            horizontalArrangement = Arrangement.SpaceBetween
                         ) {
-                            Image(
-                                painter = painterResource(R.drawable.reorder),
-                                contentDescription = null,
-                                colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.7f)),
-                                modifier = Modifier.size(18.dp)
-                            )
-                            BasicText(
-                                text = "Sort by: ${if (isSortedOldestFirst) "Oldest First" else "Custom Order"}",
-                                style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.8f))
-                            )
+                            // Left: sort icon + text
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.reorder),
+                                    contentDescription = null,
+                                    colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.7f)),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                BasicText(
+                                    text = "Sort by: ${if (isSortedOldestFirst) "Oldest First" else "Custom Order"}",
+                                    style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.8f))
+                                )
+                            }
+
+                            // Right: song count (small capsule INSIDE the sort capsule)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(Color.White.copy(alpha = 0.15f))
+                                    .padding(horizontal = 8.dp, vertical = 3.dp)
+                            ) {
+                                BasicText(
+                                    text = "${displaySongs.size}",
+                                    style = typography.xxs.semiBold.copy(color = Color.White.copy(alpha = 0.8f))
+                                )
+                            }
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
