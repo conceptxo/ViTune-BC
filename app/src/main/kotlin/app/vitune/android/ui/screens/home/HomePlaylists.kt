@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -196,12 +197,18 @@ fun HomePlaylists(
             }
 
             // 2x2 Bento Grid Layout for Built-in Playlists
+            // IMPORTANT: padding matches the LazyVerticalGrid's contentPadding
+            // (which uses alternativePadding on the End side) so the top 4 buttons
+            // align vertically with the playlist cards below them.
             if (builtInPlaylists.isNotEmpty()) item(key = "built_in_grid", span = { GridItemSpan(maxLineSpan) }) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Dimensions.items.alternativePadding),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 6.dp)
+                        .padding(
+                            horizontal = Dimensions.items.alternativePadding,
+                            vertical = 6.dp
+                        )
                 ) {
                     // Row 1: Favorites & Offline side-by-side
                     Row(
@@ -318,6 +325,52 @@ fun HomePlaylists(
                         }
                     }
                 }
+        }
+
+        // ---- Gemini Sparkle Icon Overlay ----
+        // Shows a glassy sparkle icon in the CENTER GAP between the first 4
+        // playlist cards (only when there are exactly 4 playlists in a 2-column grid).
+        // The icon sits at the intersection of the 2x2 grid, floating above the gap.
+        if (UIStatePreferences.playlistsAsGrid && items.size == 4) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(bottom = 100.dp)  // Offset so it sits over the 2x2 center, not screen center
+            ) {
+                // Glassy sparkle container
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(50))
+                        .background(
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.25f),
+                                    Color.White.copy(alpha = 0.10f)
+                                )
+                            )
+                        )
+                        .border(
+                            width = 1.dp,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.6f),
+                                    Color.White.copy(alpha = 0.2f)
+                                )
+                            ),
+                            shape = RoundedCornerShape(50)
+                        )
+                        .shadow(8.dp, RoundedCornerShape(50)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Image(
+                        painter = painterResource(R.drawable.sparkles),
+                        contentDescription = null,
+                        colorFilter = ColorFilter.tint(Color.White),
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+            }
         }
 
         FloatingActionsContainerWithScrollToTop(
