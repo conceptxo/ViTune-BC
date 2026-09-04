@@ -199,17 +199,37 @@ fun PlaylistItem(
 ) {
     val (colorPalette, typography, thumbnailShapeCorners) = LocalAppearance.current
 
-    // ---- SUBTLE GLASS CONTAINER ----
-    // Very low alpha (5%) so it looks like frosted glass, NOT a grey rectangle.
-    // The thin white border (20%) creates the "glass edge" without a visible fill.
+    // ---- GLOSSY GLASS CONTAINER ----
+    // 3 layers for real "glass with gloss" effect:
+    // 1. Translucent white fill (8% — gives glass substance)
+    // 2. Glossy highlight gradient at top (40% → 0% — simulates light reflection)
+    // 3. Thin white border (20% — glass edge)
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.05f))
+            // Layer 1: Translucent fill
+            .background(Color.White.copy(alpha = 0.08f))
+            // Layer 2: Glossy top highlight (drawn on top of fill)
+            .background(
+                brush = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.0f to Color.White.copy(alpha = 0.35f),   // Bright top edge (light catch)
+                        0.3f to Color.White.copy(alpha = 0.08f),   // Fades quickly
+                        0.5f to Color.Transparent                  // Gone by middle
+                    )
+                )
+            )
+            // Layer 3: White border (glass edge)
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.2f),
+                color = Color.White.copy(alpha = 0.25f),
                 shape = RoundedCornerShape(20.dp)
+            )
+            // Layer 4: Shadow for depth
+            .shadow(
+                elevation = 10.dp,
+                shape = RoundedCornerShape(20.dp),
+                clip = false
             )
     ) {
         Column(
@@ -299,10 +319,19 @@ fun PlaylistItemPlaceholder(
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.05f))
+            .background(Color.White.copy(alpha = 0.08f))
+            .background(
+                brush = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.0f to Color.White.copy(alpha = 0.35f),
+                        0.3f to Color.White.copy(alpha = 0.08f),
+                        0.5f to Color.Transparent
+                    )
+                )
+            )
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.2f),
+                color = Color.White.copy(alpha = 0.25f),
                 shape = RoundedCornerShape(20.dp)
             )
     ) {
