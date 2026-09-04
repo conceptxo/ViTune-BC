@@ -204,36 +204,43 @@ fun PlaylistItem(
 ) {
     val (colorPalette, typography, thumbnailShapeCorners) = LocalAppearance.current
 
-    // ---- LIQUID GLASS CONTAINER (cover + name together) ----
-    // The glass wraps BOTH the cover art AND the playlist name.
-    // - Translucent white gradient background (frosted glass look)
-    // - Subtle white gradient border (top bright, bottom subtle)
-    // - Soft shadow for elevation
-    // - Playlist name INSIDE the glass, compact (not expanded)
+    // ---- TRUE GLASS MORPHISM CONTAINER ----
+    // Uses Modifier.blur() for actual backdrop blur (API 31+).
+    // The blur frosts whatever is behind the card, creating real glass.
+    // Multi-stop gradient simulates light refraction through glass.
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(24.dp))
+            // Layer 1: Heavy backdrop blur (the "frosted glass" look)
+            // This blurs what's BEHIND the card.
+            .blur(24.dp)
+            // Layer 2: Translucent white fill with multi-stop gradient
+            // (top: brighter for light catch, middle: subtle, bottom: darker)
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.18f),
-                        Color.White.copy(alpha = 0.08f)
+                    colorStops = arrayOf(
+                        0.00f to Color.White.copy(alpha = 0.15f),
+                        0.30f to Color.White.copy(alpha = 0.08f),
+                        0.70f to Color.White.copy(alpha = 0.05f),
+                        1.00f to Color.White.copy(alpha = 0.12f)
                     )
                 )
             )
+            // Layer 3: White gradient border (top bright, bottom subtle)
             .border(
                 width = 1.dp,
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.5f),
-                        Color.White.copy(alpha = 0.15f)
+                        Color.White.copy(alpha = 0.4f),
+                        Color.White.copy(alpha = 0.1f)
                     )
                 ),
-                shape = RoundedCornerShape(20.dp)
+                shape = RoundedCornerShape(24.dp)
             )
+            // Layer 4: Soft shadow for elevation
             .shadow(
-                elevation = 12.dp,
-                shape = RoundedCornerShape(20.dp),
+                elevation = 16.dp,
+                shape = RoundedCornerShape(24.dp),
                 clip = false
             )
     ) {
@@ -248,8 +255,8 @@ fun PlaylistItem(
                         if (alternative) Modifier.fillMaxWidth().aspectRatio(1f)
                         else Modifier.requiredSize(thumbnailSize)
                     )
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .padding(10.dp)
+                    .clip(RoundedCornerShape(16.dp))
             ) {
                 thumbnailContent(Modifier.fillMaxSize())
 
@@ -272,8 +279,8 @@ fun PlaylistItem(
                 }
             }
 
-            // ---- PLAYLIST NAME (INSIDE the glass, COMPACT) ----
-            // Tight padding so the text area isn't expanded.
+            // ---- PLAYLIST NAME (INSIDE the glass, directly below cover) ----
+            // Compact padding — name sits right below the cover.
             BasicText(
                 text = name.orEmpty(),
                 style = typography.xs.semiBold.let {
@@ -281,14 +288,14 @@ fun PlaylistItem(
                 }.copy(
                     color = colorPalette.text,
                     shadow = androidx.compose.ui.graphics.Shadow(
-                        color = Color.Black.copy(alpha = 0.5f),
-                        blurRadius = 3f,
+                        color = Color.Black.copy(alpha = 0.6f),
+                        blurRadius = 4f,
                         offset = androidx.compose.ui.geometry.Offset(1f, 1f)
                     )
                 ),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
             )
 
             // Channel name (if present)
@@ -303,7 +310,7 @@ fun PlaylistItem(
                 ),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
             )
         }
     }
@@ -317,22 +324,24 @@ fun PlaylistItemPlaceholder(
 ) {
     val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
 
-    // Glass wraps both cover placeholder and text placeholders (matches PlaylistItem)
+    // Glass morphism placeholder (matches PlaylistItem)
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(24.dp))
+            .blur(24.dp)
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.18f),
-                        Color.White.copy(alpha = 0.08f)
+                    colorStops = arrayOf(
+                        0.00f to Color.White.copy(alpha = 0.15f),
+                        0.50f to Color.White.copy(alpha = 0.06f),
+                        1.00f to Color.White.copy(alpha = 0.12f)
                     )
                 )
             )
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.3f),
-                shape = RoundedCornerShape(20.dp)
+                color = Color.White.copy(alpha = 0.25f),
+                shape = RoundedCornerShape(24.dp)
             )
     ) {
         Column(
@@ -346,14 +355,14 @@ fun PlaylistItemPlaceholder(
                         if (alternative) Modifier.fillMaxWidth().aspectRatio(1f)
                         else Modifier.requiredSize(thumbnailSize)
                     )
-                    .padding(8.dp)
-                    .clip(RoundedCornerShape(14.dp))
+                    .padding(10.dp)
+                    .clip(RoundedCornerShape(16.dp))
                     .background(color = colorPalette.shimmer)
             )
 
             // Text placeholders (inside glass, compact)
-            TextPlaceholder(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
-            TextPlaceholder(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+            TextPlaceholder(modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
+            TextPlaceholder(modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
         }
     }
 }
