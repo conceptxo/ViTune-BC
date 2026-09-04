@@ -93,6 +93,7 @@ import coil3.toBitmap
 import androidx.palette.graphics.Palette
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.withContext
 import app.vitune.providers.piped.models.PlaylistPreview as PipedPlaylistPreview
 
