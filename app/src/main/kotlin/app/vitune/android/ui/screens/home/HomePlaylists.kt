@@ -365,29 +365,38 @@ fun FluidInterlockingPlaylistPill(
         )
     }
 
-    // ---- SUBTLE GLASS for built-in playlist buttons ----
-    // Same style as playlist cards: 5% white fill + 20% white border.
-    // Color tint adds a subtle colored glow (red for Favorites, etc.)
+    // ---- GLOSSY GLASS for built-in playlist buttons ----
+    // Same glossy effect as playlist cards:
+    // 1. Color-tinted translucent fill
+    // 2. Glossy white highlight at top (light reflection)
+    // 3. White border (glass edge)
+    // 4. Shadow for depth
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
             .clip(RoundedCornerShape(20.dp))
+            // Layer 1: Color-tinted fill
+            .background(colorTint.copy(alpha = 0.10f))
+            // Layer 2: Glossy top highlight
             .background(
                 brush = Brush.verticalGradient(
-                    colors = listOf(
-                        colorTint.copy(alpha = 0.12f),
-                        Color.White.copy(alpha = 0.05f)
+                    colorStops = arrayOf(
+                        0.0f to Color.White.copy(alpha = 0.30f),   // Bright top (light catch)
+                        0.3f to Color.White.copy(alpha = 0.08f),   // Fades
+                        0.5f to Color.Transparent                  // Gone by middle
                     )
                 )
             )
+            // Layer 3: White border
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.2f),
+                color = Color.White.copy(alpha = 0.25f),
                 shape = RoundedCornerShape(20.dp)
             )
+            // Layer 4: Shadow
             .shadow(
-                elevation = 6.dp,
+                elevation = 8.dp,
                 shape = RoundedCornerShape(20.dp),
                 clip = false
             )
