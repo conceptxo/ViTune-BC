@@ -3,6 +3,7 @@ package app.vitune.android.ui.items
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -20,7 +22,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.ContentScale
@@ -50,6 +56,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
+
+// ====================================================================
+//  LIQUID GLASS PLAYLIST ITEM (Apple iOS 26 / Vision Pro style)
+//  - Entire card is a frosted glass container with subtle blur
+//  - Playlist cover sits on top, slightly raised (with shadow)
+//  - Playlist name floats on the glass below the cover
+//  - Glossy white highlight on top edge for "wet glass" feel
+//  - Interlocking-friendly rounded corners (squircle-like)
+// ====================================================================
 
 @Composable
 fun PlaylistItem(
@@ -173,6 +188,9 @@ fun PlaylistItem(
     alternative = alternative
 )
 
+// ====================================================================
+//  MAIN PLAYLIST ITEM — Liquid Glass Edition
+// ====================================================================
 @Composable
 fun PlaylistItem(
     thumbnailContent: @Composable BoxScope.(modifier: Modifier) -> Unit,
@@ -182,67 +200,121 @@ fun PlaylistItem(
     thumbnailSize: Dp,
     modifier: Modifier = Modifier,
     alternative: Boolean = false
-) = ItemContainer(
-    alternative = alternative,
-    thumbnailSize = thumbnailSize,
-    modifier = Modifier.clip(
-        (
-            LocalAppearance.current.thumbnailShapeCorners +
-                if (alternative) Dimensions.items.alternativePadding else Dimensions.items.horizontalPadding
-            ).roundedShape
-    ) then modifier
-) { centeredModifier ->
+) {
     val (colorPalette, typography, thumbnailShapeCorners) = LocalAppearance.current
 
+    // ---- LIQUID GLASS CONTAINER ----
+    // The entire card is wrapped in a frosted glass effect:
+    // - Semi-transparent white background (mimics glass translucency)
+    // - Subtle white border (mimics glass edge highlight)
+    // - Soft shadow (mimics elevation)
+    // - Backdrop blur (the "wet glass" look — blurs what's behind it)
     Box(
-        modifier = centeredModifier
-            .clip(thumbnailShapeCorners.roundedShape)
-            .background(color = colorPalette.background1)
-            .let {
-                if (alternative) it
-                    .sizeIn(
-                        minWidth = thumbnailSize,
-                        minHeight = thumbnailSize
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                // Glossy vertical gradient — top is brighter (light catch),
+                // bottom is more transparent (depth).
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.18f),
+                        Color.White.copy(alpha = 0.08f)
                     )
-                    .fillMaxWidth()
-                    .aspectRatio(1f)
-                else it.requiredSize(thumbnailSize)
-            }
+                )
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.5f),   // Top edge: bright highlight
+                        Color.White.copy(alpha = 0.15f)   // Bottom edge: subtle
+                    )
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .shadow(
+                elevation = 12.dp,
+                shape = RoundedCornerShape(20.dp),
+                clip = false
+            )
+            .padding(12.dp)
     ) {
-        thumbnailContent(Modifier.fillMaxSize())
-
-        songCount?.let {
-            BasicText(
-                text = "$songCount",
-                style = typography.xxs.medium.color(colorPalette.onOverlay),
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
+        Column(
+            horizontalAlignment = if (alternative) Alignment.CenterHorizontally else Alignment.Start,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // ---- PLAYLIST COVER (the white "P.C" block in your drawing) ----
+            // Sits on top of the glass, with its own shadow for depth.
+            Box(
                 modifier = Modifier
-                    .padding(all = Dimensions.items.gap)
-                    .background(
-                        color = colorPalette.overlay,
-                        shape = (thumbnailShapeCorners - Dimensions.items.gap).coerceAtLeast(0.dp).roundedShape
+                    .then(
+                        if (alternative) Modifier.fillMaxWidth().aspectRatio(1f)
+                        else Modifier.requiredSize(thumbnailSize)
                     )
-                    .padding(horizontal = 4.dp, vertical = 2.dp)
-                    .align(Alignment.BottomEnd)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(color = colorPalette.background1)
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(14.dp),
+                        clip = false
+                    )
+            ) {
+                thumbnailContent(Modifier.fillMaxSize())
+
+                // Song count badge (top-right of cover)
+                songCount?.let {
+                    BasicText(
+                        text = "$songCount",
+                        style = typography.xxs.medium.color(colorPalette.onOverlay),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(all = Dimensions.items.gap)
+                            .background(
+                                color = colorPalette.overlay,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .align(Alignment.BottomEnd)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.size(10.dp))
+
+            // ---- PLAYLIST NAME (yellow in your drawing) ----
+            // White text with subtle shadow for readability on glass.
+            BasicText(
+                text = name.orEmpty(),
+                style = typography.xs.semiBold.let {
+                    if (alternative && channelName.isNullOrBlank()) it.center else it
+                }.copy(
+                    color = Color.White,
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        blurRadius = 3f,
+                        offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                    )
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
+            )
+
+            // Channel name (if present)
+            if (channelName?.isNotBlank() == true) BasicText(
+                text = channelName,
+                style = typography.xs.semiBold.secondary.copy(
+                    color = Color.White.copy(alpha = 0.7f),
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color.Black.copy(alpha = 0.4f),
+                        blurRadius = 2f,
+                        offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                    )
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis
             )
         }
-    }
-
-    ItemInfoContainer(modifier = if (alternative && channelName.isNullOrBlank()) centeredModifier else Modifier) {
-        BasicText(
-            text = name.orEmpty(),
-            style = typography.xs.semiBold.let { if (alternative && channelName.isNullOrBlank()) it.center else it },
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
-
-        if (channelName?.isNotBlank() == true) BasicText(
-            text = channelName,
-            style = typography.xs.semiBold.secondary,
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis
-        )
     }
 }
 
@@ -251,23 +323,57 @@ fun PlaylistItemPlaceholder(
     thumbnailSize: Dp,
     modifier: Modifier = Modifier,
     alternative: Boolean = false
-) = ItemContainer(
-    alternative = alternative,
-    thumbnailSize = thumbnailSize,
-    modifier = modifier
 ) {
     val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
 
-    Spacer(
-        modifier = Modifier
-            .background(color = colorPalette.shimmer, shape = thumbnailShape)
-            .size(thumbnailSize)
-    )
-
-    ItemInfoContainer(
-        horizontalAlignment = if (alternative) Alignment.CenterHorizontally else Alignment.Start
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.18f),
+                        Color.White.copy(alpha = 0.08f)
+                    )
+                )
+            )
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .padding(12.dp)
     ) {
-        TextPlaceholder()
-        TextPlaceholder()
+        Column(
+            horizontalAlignment = if (alternative) Alignment.CenterHorizontally else Alignment.Start,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Spacer(
+                modifier = Modifier
+                    .then(
+                        if (alternative) Modifier.fillMaxWidth().aspectRatio(1f)
+                        else Modifier.requiredSize(thumbnailSize)
+                    )
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(color = colorPalette.shimmer)
+            )
+
+            Spacer(modifier = Modifier.size(10.dp))
+
+            TextPlaceholder()
+            TextPlaceholder()
+        }
     }
 }
+
+// Local import to avoid breaking the existing ItemContainer/ItemInfoContainer references
+@Composable
+private fun Column(
+    modifier: Modifier = Modifier,
+    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
+    content: @Composable () -> Unit
+) = androidx.compose.foundation.layout.Column(
+    modifier = modifier,
+    horizontalAlignment = horizontalAlignment,
+    content = content
+)
