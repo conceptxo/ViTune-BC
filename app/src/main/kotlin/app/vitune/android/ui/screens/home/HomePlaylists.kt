@@ -37,6 +37,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -365,31 +366,38 @@ fun FluidInterlockingPlaylistPill(
         )
     }
 
-    // Rich luminous color gradient fill inside the pill so text and background stand out clearly on AMOLED/Pure Black
-    val interiorGradient = Brush.verticalGradient(
-        colors = listOf(
-            colorTint.copy(alpha = 0.28f),
-            colorPalette.background1.copy(alpha = 0.95f),
-            colorPalette.background0.copy(alpha = 0.98f)
-        )
-    )
-
+    // ---- GLASS MORPHISM for built-in playlist buttons ----
+    // Each pill uses: backdrop blur + translucent fill + subtle border + shadow.
+    // The colored tint creates a subtle colored glow (red for Favorites, etc.)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
-            .clip(shape)
-            .background(brush = interiorGradient)
+            .clip(RoundedCornerShape(24.dp))
+            .blur(20.dp)  // Glass morphism: backdrop blur
+            .background(
+                brush = Brush.verticalGradient(
+                    colorStops = arrayOf(
+                        0.00f to colorTint.copy(alpha = 0.18f),
+                        0.50f to Color.White.copy(alpha = 0.06f),
+                        1.00f to colorTint.copy(alpha = 0.12f)
+                    )
+                )
+            )
             .border(
                 width = 1.dp,
-                brush = Brush.linearGradient(
+                brush = Brush.verticalGradient(
                     colors = listOf(
-                        colorTint.copy(alpha = 0.9f),
-                        colorPalette.accent.copy(alpha = 0.4f),
-                        colorPalette.background0
+                        Color.White.copy(alpha = 0.3f),
+                        colorTint.copy(alpha = 0.2f)
                     )
                 ),
-                shape = shape
+                shape = RoundedCornerShape(24.dp)
+            )
+            .shadow(
+                elevation = 8.dp,
+                shape = RoundedCornerShape(24.dp),
+                clip = false
             )
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp),
