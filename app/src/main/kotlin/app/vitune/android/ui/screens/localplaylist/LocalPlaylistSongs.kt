@@ -194,25 +194,20 @@ fun LocalPlaylistSongs(
     //  - Search filters songs in playlist
     // ====================================================================
     Box(modifier = modifier.fillMaxSize()) {
-        // ---- 1. FULL-SCREEN ALBUM ART (raw AsyncImage, NO card/clip) ----
-        // This fills the ENTIRE screen edge-to-edge — no padding, no rounded corners.
-        // This is the key fix: the art IS the background, not a card on top of it.
+        // ---- 1. FULL-SCREEN ALBUM ART WITH BLUR ----
+        // The blur is ON the AsyncImage itself (not a separate empty Box).
+        // 20dp blur = ~60% blur (art shapes visible, details gone).
+        // This is the key fix — before, blur was on an empty Box which did nothing.
         AsyncImage(
             model = thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
-            modifier = Modifier.fillMaxSize()
-        )
-
-        // ---- 2. BLUR overlay (frosted glass backdrop) ----
-        // Blurs the album art so it becomes a colored ambient backdrop.
-        Box(
             modifier = Modifier
                 .fillMaxSize()
-                .blur(48.dp)
+                .blur(20.dp)
         )
 
-        // ---- 3. DARK GRADIENT (melts into pitch black #000) ----
+        // ---- 2. DARK GRADIENT (melts into pitch black #000) ----
         // Transparent at top (art visible) → semi-dark middle → pure #000 bottom
         // Zero hard cutoff — smooth, organic, atmospheric blend.
         Box(
@@ -396,8 +391,10 @@ fun LocalPlaylistSongs(
                             )
                         }
 
-                        // ---- MORE SPACER (pushes buttons DOWN to match SimpMusic) ----
-                        Spacer(modifier = Modifier.height(120.dp))
+                        // ---- LARGE SPACER (pushes content to CENTER of screen) ----
+                        // This pushes the playlist name + buttons to the vertical center,
+                        // matching the SimpMusic reference where play button is at ~50%.
+                        Spacer(modifier = Modifier.height(200.dp))
 
                         // ---- PLAYLIST NAME ----
                         BasicText(
