@@ -204,82 +204,108 @@ fun PlaylistItem(
 ) {
     val (colorPalette, typography, thumbnailShapeCorners) = LocalAppearance.current
 
-    // ---- NO GLASS BOX ----
-    // The user explicitly asked to remove the box shape behind the text and cover.
-    // The glass background and border have been REMOVED (opacity 0).
-    // Only the shadow on the cover remains for depth.
-    Column(
-        horizontalAlignment = if (alternative) Alignment.CenterHorizontally else Alignment.Start,
-        modifier = modifier.fillMaxWidth()
-    ) {
-        // ---- PLAYLIST COVER (with shadow only, no box) ----
-        Box(
-            modifier = Modifier
-                .then(
-                    if (alternative) Modifier.fillMaxWidth().aspectRatio(1f)
-                    else Modifier.requiredSize(thumbnailSize)
-                )
-                .clip(RoundedCornerShape(14.dp))
-                .shadow(
-                    elevation = 8.dp,
-                    shape = RoundedCornerShape(14.dp),
-                    clip = false
-                )
-        ) {
-            thumbnailContent(Modifier.fillMaxSize())
-
-            // Song count badge
-            songCount?.let {
-                BasicText(
-                    text = "$songCount",
-                    style = typography.xxs.medium.color(colorPalette.onOverlay),
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .padding(all = Dimensions.items.gap)
-                        .background(
-                            color = colorPalette.overlay,
-                            shape = RoundedCornerShape(8.dp)
-                        )
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
-                        .align(Alignment.BottomEnd)
+    // ---- LIQUID GLASS CONTAINER (cover + name together) ----
+    // The glass wraps BOTH the cover art AND the playlist name.
+    // - Translucent white gradient background (frosted glass look)
+    // - Subtle white gradient border (top bright, bottom subtle)
+    // - Soft shadow for elevation
+    // - Playlist name INSIDE the glass, compact (not expanded)
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.18f),
+                        Color.White.copy(alpha = 0.08f)
                     )
+                )
+            )
+            .border(
+                width = 1.dp,
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.5f),
+                        Color.White.copy(alpha = 0.15f)
+                    )
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .shadow(
+                elevation = 12.dp,
+                shape = RoundedCornerShape(20.dp),
+                clip = false
+            )
+    ) {
+        Column(
+            horizontalAlignment = if (alternative) Alignment.CenterHorizontally else Alignment.Start,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // ---- PLAYLIST COVER (image, inside the glass) ----
+            Box(
+                modifier = Modifier
+                    .then(
+                        if (alternative) Modifier.fillMaxWidth().aspectRatio(1f)
+                        else Modifier.requiredSize(thumbnailSize)
+                    )
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(14.dp))
+            ) {
+                thumbnailContent(Modifier.fillMaxSize())
+
+                // Song count badge
+                songCount?.let {
+                    BasicText(
+                        text = "$songCount",
+                        style = typography.xxs.medium.color(colorPalette.onOverlay),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .padding(all = Dimensions.items.gap)
+                            .background(
+                                color = colorPalette.overlay,
+                                shape = RoundedCornerShape(8.dp)
+                            )
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                            .align(Alignment.BottomEnd)
+                    )
+                }
             }
+
+            // ---- PLAYLIST NAME (INSIDE the glass, COMPACT) ----
+            // Tight padding so the text area isn't expanded.
+            BasicText(
+                text = name.orEmpty(),
+                style = typography.xs.semiBold.let {
+                    if (alternative && channelName.isNullOrBlank()) it.center else it
+                }.copy(
+                    color = colorPalette.text,
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        blurRadius = 3f,
+                        offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                    )
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+            )
+
+            // Channel name (if present)
+            if (channelName?.isNotBlank() == true) BasicText(
+                text = channelName,
+                style = typography.xs.semiBold.secondary.copy(
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color.Black.copy(alpha = 0.4f),
+                        blurRadius = 2f,
+                        offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                    )
+                ),
+                maxLines = 2,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+            )
         }
-
-        // ---- PLAYLIST NAME (compact, no box) ----
-        // Tight padding (4dp top, 2dp bottom) so the text area isn't expanded.
-        BasicText(
-            text = name.orEmpty(),
-            style = typography.xs.semiBold.let {
-                if (alternative && channelName.isNullOrBlank()) it.center else it
-            }.copy(
-                color = colorPalette.text,
-                shadow = androidx.compose.ui.graphics.Shadow(
-                    color = Color.Black.copy(alpha = 0.5f),
-                    blurRadius = 3f,
-                    offset = androidx.compose.ui.geometry.Offset(1f, 1f)
-                )
-            ),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
-        )
-
-        // Channel name (if present)
-        if (channelName?.isNotBlank() == true) BasicText(
-            text = channelName,
-            style = typography.xs.semiBold.secondary.copy(
-                shadow = androidx.compose.ui.graphics.Shadow(
-                    color = Color.Black.copy(alpha = 0.4f),
-                    blurRadius = 2f,
-                    offset = androidx.compose.ui.geometry.Offset(1f, 1f)
-                )
-            ),
-            maxLines = 2,
-            overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(top = 2.dp, bottom = 2.dp)
-        )
     }
 }
 
@@ -291,25 +317,44 @@ fun PlaylistItemPlaceholder(
 ) {
     val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
 
-    // No glass box — matches PlaylistItem (shadow only on cover)
-    Column(
-        horizontalAlignment = if (alternative) Alignment.CenterHorizontally else Alignment.Start,
-        modifier = modifier.fillMaxWidth()
-    ) {
-        // Cover placeholder (with shadow only)
-        Spacer(
-            modifier = Modifier
-                .then(
-                    if (alternative) Modifier.fillMaxWidth().aspectRatio(1f)
-                    else Modifier.requiredSize(thumbnailSize)
+    // Glass wraps both cover placeholder and text placeholders (matches PlaylistItem)
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(
+                brush = Brush.verticalGradient(
+                    colors = listOf(
+                        Color.White.copy(alpha = 0.18f),
+                        Color.White.copy(alpha = 0.08f)
+                    )
                 )
-                .clip(RoundedCornerShape(14.dp))
-                .background(color = colorPalette.shimmer)
-        )
+            )
+            .border(
+                width = 1.dp,
+                color = Color.White.copy(alpha = 0.3f),
+                shape = RoundedCornerShape(20.dp)
+            )
+    ) {
+        Column(
+            horizontalAlignment = if (alternative) Alignment.CenterHorizontally else Alignment.Start,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            // Cover placeholder (inside glass)
+            Spacer(
+                modifier = Modifier
+                    .then(
+                        if (alternative) Modifier.fillMaxWidth().aspectRatio(1f)
+                        else Modifier.requiredSize(thumbnailSize)
+                    )
+                    .padding(8.dp)
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(color = colorPalette.shimmer)
+            )
 
-        // Text placeholders (compact, no box)
-        TextPlaceholder(modifier = Modifier.padding(top = 4.dp))
-        TextPlaceholder()
+            // Text placeholders (inside glass, compact)
+            TextPlaceholder(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+            TextPlaceholder(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp))
+        }
     }
 }
 
