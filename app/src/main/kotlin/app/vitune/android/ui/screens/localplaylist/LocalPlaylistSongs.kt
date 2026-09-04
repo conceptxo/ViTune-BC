@@ -124,6 +124,7 @@ fun LocalPlaylistSongs(
     var isSortedOldestFirst by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearching by rememberSaveable { mutableStateOf(false) }
+    var isLocked by rememberSaveable { mutableStateOf(true) }
 
     // Filter + sort songs
     val displaySongs = remember(songs, isSortedOldestFirst, searchQuery, isSearching) {
@@ -194,17 +195,15 @@ fun LocalPlaylistSongs(
     //  - Search filters songs in playlist
     // ====================================================================
     Box(modifier = modifier.fillMaxSize()) {
-        // ---- 1. FULL-SCREEN ALBUM ART WITH BLUR ----
-        // The blur is ON the AsyncImage itself (not a separate empty Box).
-        // 20dp blur = ~60% blur (art shapes visible, details gone).
-        // This is the key fix — before, blur was on an empty Box which did nothing.
+        // ---- 1. FULL-SCREEN ALBUM ART WITH BLUR (45-50%) ----
+        // 15dp blur = ~45-50% blur (shapes visible, details gone).
         AsyncImage(
             model = thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .blur(20.dp)
+                .blur(15.dp)
         )
 
         // ---- 2. DARK GRADIENT (melts into pitch black #000) ----
@@ -272,20 +271,20 @@ fun LocalPlaylistSongs(
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
                                 }
 
-                                // Search — plain icon (WORKS — toggles search mode)
+                                // Lock icon — toggles reorder handle visibility
+                                // When locked: reorder handles hidden. When unlocked: visible.
                                 Image(
-                                    painter = painterResource(R.drawable.search),
-                                    contentDescription = "Search",
+                                    painter = painterResource(
+                                        if (isLocked) R.drawable.lock else R.drawable.lock_open
+                                    ),
+                                    contentDescription = if (isLocked) "Unlock reordering" else "Lock reordering",
                                     colorFilter = ColorFilter.tint(Color.White),
                                     modifier = Modifier
                                         .size(28.dp)
                                         .clickable(
                                             interactionSource = remember { MutableInteractionSource() },
                                             indication = null
-                                        ) {
-                                            isSearching = !isSearching
-                                            if (!isSearching) searchQuery = ""
-                                        }
+                                        ) { isLocked = !isLocked }
                                 )
 
                                 // Menu — plain icon
@@ -391,10 +390,26 @@ fun LocalPlaylistSongs(
                             )
                         }
 
-                        // ---- LARGE SPACER (pushes content to CENTER of screen) ----
-                        // This pushes the playlist name + buttons to the vertical center,
-                        // matching the SimpMusic reference where play button is at ~50%.
-                        Spacer(modifier = Modifier.height(200.dp))
+                        // ---- CRISP COVER PHOTO (on top of blurred background) ----
+                        // This is the ACTUAL playlist cover, NOT blurred.
+                        // Sits at the top center, with 12dp rounded corners + shadow.
+                        // The blurred background is visible around it.
+                        Box(
+                            modifier = Modifier
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .size(width = 200.dp, height = 200.dp)
+                                .clip(RoundedCornerShape(12.dp))
+                                .shadow(16.dp, RoundedCornerShape(12.dp))
+                        ) {
+                            AsyncImage(
+                                model = thumbnailUrl,
+                                contentDescription = "Playlist cover",
+                                contentScale = ContentScale.Crop,
+                                modifier = Modifier.fillMaxSize()
+                            )
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         // ---- PLAYLIST NAME ----
                         BasicText(
@@ -598,7 +613,10 @@ fun LocalPlaylistSongs(
                         song = song,
                         thumbnailSize = Dimensions.thumbnails.song,
                         trailingContent = {
-                            ReorderHandle(reorderingState = reorderingState, index = index)
+                            // Reorder handle only visible when unlocked
+                            if (!isLocked) {
+                                ReorderHandle(reorderingState = reorderingState, index = index)
+                            }
                         },
                         clip = !reorderingState.isDragging,
                         isPlaying = playing && currentMediaId == song.id
