@@ -49,6 +49,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -92,6 +93,7 @@ import app.vitune.core.ui.LocalAppearance
 import app.vitune.providers.innertube.Innertube
 import app.vitune.providers.innertube.models.bodies.BrowseBody
 import app.vitune.providers.innertube.requests.playlistPage
+import coil3.compose.AsyncImage
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
@@ -105,8 +107,8 @@ import java.util.Locale
 fun LocalPlaylistSongs(
     playlist: Playlist,
     songs: ImmutableList<Song>,
+    thumbnailUrl: String?,
     onDelete: () -> Unit,
-    thumbnailContent: @Composable () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val (colorPalette, typography) = LocalAppearance.current
@@ -181,22 +183,29 @@ fun LocalPlaylistSongs(
     val createdDate = remember(playlist.id) { dateFormat.format(Date()) }
 
     // ====================================================================
-    //  SIMPMUSIC-STYLE IMMERSIVE PLAYLIST DETAIL (v3)
-    //  - Album art fills ENTIRE screen (full bleed, edge-to-edge)
-    //  - Soft alpha mask on art bottom (fades to transparent)
-    //  - Dark gradient: semi-transparent top → pitch black (#000) bottom
-    //  - Top bar: Back (left) + Search+Menu (right) — plain icons
-    //  - Buttons positioned LOWER (matching SimpMusic)
-    //  - Sort capsule = COMPACT + song count INSIDE on the right
-    //  - Search actually filters songs in the playlist
+    //  SIMPMUSIC-STYLE IMMERSIVE PLAYLIST DETAIL (v4)
+    //  - Album art as FULL-SCREEN AsyncImage (no card, no clip, no padding)
+    //  - 48dp blur creates frosted colored backdrop
+    //  - Dark gradient melts from transparent → pitch black #000
+    //  - Back/Search/Menu = plain icons (no circles)
+    //  - Shuffle/Search = solid circles
+    //  - Play/Pause = white pill
+    //  - Sort works + song count inside capsule
+    //  - Search filters songs in playlist
     // ====================================================================
     Box(modifier = modifier.fillMaxSize()) {
-        // ---- 1. FULL-BLEED ALBUM ART BACKGROUND ----
-        Box(modifier = Modifier.fillMaxSize()) {
-            thumbnailContent()
-        }
+        // ---- 1. FULL-SCREEN ALBUM ART (raw AsyncImage, NO card/clip) ----
+        // This fills the ENTIRE screen edge-to-edge — no padding, no rounded corners.
+        // This is the key fix: the art IS the background, not a card on top of it.
+        AsyncImage(
+            model = thumbnailUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier.fillMaxSize()
+        )
 
         // ---- 2. BLUR overlay (frosted glass backdrop) ----
+        // Blurs the album art so it becomes a colored ambient backdrop.
         Box(
             modifier = Modifier
                 .fillMaxSize()
