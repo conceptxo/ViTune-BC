@@ -367,20 +367,20 @@ fun FluidInterlockingPlaylistPill(
     }
 
     // ---- GLASS MORPHISM for built-in playlist buttons ----
-    // Each pill uses: backdrop blur + translucent fill + subtle border + shadow.
+    // Each pill uses: translucent fill + subtle border + shadow.
+    // NO Modifier.blur() — that would blur the icon and text inside.
     // The colored tint creates a subtle colored glow (red for Favorites, etc.)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
             .clip(RoundedCornerShape(24.dp))
-            .blur(20.dp)  // Glass morphism: backdrop blur
             .background(
                 brush = Brush.verticalGradient(
                     colorStops = arrayOf(
-                        0.00f to colorTint.copy(alpha = 0.18f),
-                        0.50f to Color.White.copy(alpha = 0.06f),
-                        1.00f to colorTint.copy(alpha = 0.12f)
+                        0.00f to colorTint.copy(alpha = 0.20f),
+                        0.50f to Color.White.copy(alpha = 0.08f),
+                        1.00f to colorTint.copy(alpha = 0.14f)
                     )
                 )
             )
@@ -388,7 +388,7 @@ fun FluidInterlockingPlaylistPill(
                 width = 1.dp,
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.3f),
+                        Color.White.copy(alpha = 0.35f),
                         colorTint.copy(alpha = 0.2f)
                     )
                 ),
