@@ -253,8 +253,8 @@ fun PlaylistItem(
                         if (alternative) Modifier.fillMaxWidth().aspectRatio(1f)
                         else Modifier.requiredSize(thumbnailSize)
                     )
-                    .padding(10.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(14.dp))
             ) {
                 thumbnailContent(Modifier.fillMaxSize())
 
@@ -278,6 +278,7 @@ fun PlaylistItem(
             }
 
             // ---- PLAYLIST NAME (INSIDE glass, CENTERED, directly below cover) ----
+            // Tight padding — name sits RIGHT below the cover, minimal gap.
             BasicText(
                 text = name.orEmpty(),
                 style = typography.xs.semiBold.let {
@@ -294,7 +295,7 @@ fun PlaylistItem(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 8.dp)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             )
 
             // Channel name (if present)
@@ -311,7 +312,7 @@ fun PlaylistItem(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 10.dp, vertical = 2.dp)
+                    .padding(horizontal = 8.dp, vertical = 2.dp)
             )
         }
     }
