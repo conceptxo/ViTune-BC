@@ -139,7 +139,7 @@ fun HomePlaylists(
                 GridCells.Adaptive(Dimensions.thumbnails.playlist + Dimensions.items.alternativePadding * 2)
             else GridCells.Fixed(1),
             contentPadding = LocalPlayerAwareWindowInsets.current
-                .only(WindowInsetsSides.Vertical + WindowInsetsSides.End)
+                .only(WindowInsetsSides.Vertical + WindowInsetsSides.Horizontal)
                 .asPaddingValues(),
             horizontalArrangement = Arrangement.spacedBy(Dimensions.items.alternativePadding),
             verticalArrangement = if (UIStatePreferences.playlistsAsGrid)
@@ -197,18 +197,14 @@ fun HomePlaylists(
             }
 
             // 2x2 Bento Grid Layout for Built-in Playlists
-            // IMPORTANT: padding matches the LazyVerticalGrid's contentPadding
-            // (which uses alternativePadding on the End side) so the top 4 buttons
-            // align vertically with the playlist cards below them.
+            // NO extra horizontal padding — the LazyVerticalGrid's contentPadding
+            // handles the horizontal insets, so the buttons align with playlist cards.
             if (builtInPlaylists.isNotEmpty()) item(key = "built_in_grid", span = { GridItemSpan(maxLineSpan) }) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Dimensions.items.alternativePadding),
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(
-                            horizontal = Dimensions.items.alternativePadding,
-                            vertical = 6.dp
-                        )
+                        .padding(vertical = 6.dp)
                 ) {
                     // Row 1: Favorites & Offline side-by-side
                     Row(
@@ -325,52 +321,6 @@ fun HomePlaylists(
                         }
                     }
                 }
-        }
-
-        // ---- Gemini Sparkle Icon Overlay ----
-        // Shows a glassy sparkle icon in the CENTER GAP between the first 4
-        // playlist cards (only when there are exactly 4 playlists in a 2-column grid).
-        // The icon sits at the intersection of the 2x2 grid, floating above the gap.
-        if (UIStatePreferences.playlistsAsGrid && items.size == 4) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .padding(bottom = 100.dp)  // Offset so it sits over the 2x2 center, not screen center
-            ) {
-                // Glassy sparkle container
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.25f),
-                                    Color.White.copy(alpha = 0.10f)
-                                )
-                            )
-                        )
-                        .border(
-                            width = 1.dp,
-                            brush = Brush.verticalGradient(
-                                colors = listOf(
-                                    Color.White.copy(alpha = 0.6f),
-                                    Color.White.copy(alpha = 0.2f)
-                                )
-                            ),
-                            shape = RoundedCornerShape(50)
-                        )
-                        .shadow(8.dp, RoundedCornerShape(50)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(R.drawable.sparkles),
-                        contentDescription = null,
-                        colorFilter = ColorFilter.tint(Color.White),
-                        modifier = Modifier.size(24.dp)
-                    )
-                }
-            }
         }
 
         FloatingActionsContainerWithScrollToTop(
