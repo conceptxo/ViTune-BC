@@ -4,13 +4,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import app.vitune.android.Database
-import app.vitune.android.R
 import app.vitune.android.models.Playlist
 import app.vitune.android.models.Song
-import app.vitune.android.ui.components.themed.Scaffold
 import app.vitune.android.ui.components.themed.adaptiveThumbnailContent
 import app.vitune.android.ui.screens.GlobalRoutes
 import app.vitune.android.ui.screens.Route
@@ -25,8 +22,6 @@ import kotlinx.coroutines.flow.filterNotNull
 @Route
 @Composable
 fun LocalPlaylistScreen(playlistId: Long) {
-    val saveableStateHolder = rememberSaveableStateHolder()
-
     PersistMapCleanup(prefix = "localPlaylist/$playlistId/")
 
     RouteHandler {
@@ -60,28 +55,15 @@ fun LocalPlaylistScreen(playlistId: Long) {
                 } ?: { }
             }
 
-            Scaffold(
-                key = "localplaylist",
-                topIconButtonId = R.drawable.chevron_back,
-                onTopIconButtonClick = pop,
-                tabIndex = 0,
-                onTabChange = { },
-                tabColumnContent = {
-                    tab(0, R.string.songs, R.drawable.musical_notes)
-                }
-            ) { currentTabIndex ->
-                saveableStateHolder.SaveableStateProvider(currentTabIndex) {
-                    playlist?.let {
-                        when (currentTabIndex) {
-                            0 -> LocalPlaylistSongs(
-                                playlist = it,
-                                songs = songs,
-                                thumbnailContent = thumbnailContent,
-                                onDelete = pop
-                            )
-                        }
-                    }
-                }
+            // NO Scaffold — no left navigation rail, no tab column.
+            // The LocalPlaylistSongs handles EVERYTHING: back button, menu, art, list.
+            playlist?.let {
+                LocalPlaylistSongs(
+                    playlist = it,
+                    songs = songs,
+                    thumbnailContent = thumbnailContent,
+                    onDelete = pop
+                )
             }
         }
     }
