@@ -696,7 +696,7 @@ fun BitChordPlayer(
                     .padding(top = 2.dp)
             ) {
                 Image(
-                    painter = painterResource(R.drawable.clock),
+                    painter = painterResource(R.drawable.time),
                     contentDescription = null,
                     colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.5f)),
                     modifier = Modifier.size(12.dp)
