@@ -6,20 +6,32 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicText
+import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -30,10 +42,19 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.LookaheadScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.vitune.android.Database
 import app.vitune.android.LocalPlayerAwareWindowInsets
@@ -48,15 +69,10 @@ import app.vitune.android.transaction
 import app.vitune.android.ui.components.LocalMenuState
 import app.vitune.android.ui.components.themed.CircularProgressIndicator
 import app.vitune.android.ui.components.themed.ConfirmationDialog
-import app.vitune.android.ui.components.themed.FloatingActionsContainerWithScrollToTop
-import app.vitune.android.ui.components.themed.Header
-import app.vitune.android.ui.components.themed.HeaderIconButton
 import app.vitune.android.ui.components.themed.InPlaylistMediaItemMenu
-import app.vitune.android.ui.components.themed.LayoutWithAdaptiveThumbnail
 import app.vitune.android.ui.components.themed.Menu
 import app.vitune.android.ui.components.themed.MenuEntry
 import app.vitune.android.ui.components.themed.ReorderHandle
-import app.vitune.android.ui.components.themed.SecondaryTextButton
 import app.vitune.android.ui.components.themed.TextFieldDialog
 import app.vitune.android.ui.items.SongItem
 import app.vitune.android.utils.PlaylistDownloadIcon
@@ -67,6 +83,7 @@ import app.vitune.android.utils.forcePlayAtIndex
 import app.vitune.android.utils.forcePlayFromBeginning
 import app.vitune.android.utils.launchYouTubeMusic
 import app.vitune.android.utils.playingSong
+import app.vitune.android.utils.semiBold
 import app.vitune.android.utils.toast
 import app.vitune.compose.reordering.animateItemPlacement
 import app.vitune.compose.reordering.draggedItem
@@ -90,11 +107,8 @@ fun LocalPlaylistSongs(
     onDelete: () -> Unit,
     thumbnailContent: @Composable () -> Unit,
     modifier: Modifier = Modifier
-) = LayoutWithAdaptiveThumbnail(
-    thumbnailContent = thumbnailContent,
-    modifier = modifier
 ) {
-    val (colorPalette) = LocalAppearance.current
+    val (colorPalette, typography) = LocalAppearance.current
     val binder = LocalPlayerServiceBinder.current
     val menuState = LocalMenuState.current
     val uriHandler = LocalUriHandler.current
@@ -166,7 +180,48 @@ fun LocalPlaylistSongs(
 
     val (currentMediaId, playing) = playingSong(binder)
 
-    Box {
+    // ====================================================================
+    //  SIMPMUSIC-STYLE PLAYLIST DETAIL SCREEN
+    //  - Album art as full-screen blurred background
+    //  - Gradient overlay (transparent top → dark bottom) for seamless blend
+    //  - Top-right: Glossy menu button only (no search)
+    //  - Center: Shuffle, Play/Pause, Search buttons
+    //  - Song list below with dark background
+    // ====================================================================
+    Box(modifier = modifier.fillMaxSize()) {
+        // 1. BLURRED ALBUM ART BACKGROUND (full screen)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .then(
+                    playlist.thumbnail?.let { url ->
+                        Modifier.background(color = colorPalette.background0)
+                    } ?: Modifier.background(color = colorPalette.background0)
+                )
+        ) {
+            // Blurred background image
+            thumbnailContent()
+        }
+
+        // 2. GRADIENT OVERLAY (transparent top → dark bottom)
+        // This creates the "seamless blend" from album art to dark song list
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.00f to Color.Black.copy(alpha = 0.20f),
+                            0.30f to Color.Black.copy(alpha = 0.40f),
+                            0.50f to Color.Black.copy(alpha = 0.70f),
+                            0.70f to colorPalette.background0.copy(alpha = 0.90f),
+                            1.00f to colorPalette.background0
+                        )
+                    )
+                )
+        )
+
+        // 3. CONTENT (LazyColumn with header + songs)
         LookaheadScope {
             LazyColumn(
                 state = reorderingState.lazyListState,
@@ -174,133 +229,310 @@ fun LocalPlaylistSongs(
                     .only(WindowInsetsSides.Vertical + WindowInsetsSides.End)
                     .asPaddingValues(),
                 modifier = Modifier
-                    .background(colorPalette.background0)
                     .fillMaxSize()
             ) {
                 item(
                     key = "header",
                     contentType = 0
                 ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Header(
-                            title = playlist.name,
-                            modifier = Modifier.padding(bottom = 8.dp)
+                    Column(
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        // ---- TOP BAR: Menu button (top-right, glossy) ----
+                        Row(
+                            horizontalArrangement = Arrangement.End,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
-                            SecondaryTextButton(
-                                text = stringResource(R.string.enqueue),
-                                enabled = songs.isNotEmpty(),
-                                onClick = {
-                                    binder?.player?.enqueue(songs.map { it.asMediaItem })
-                                }
-                            )
-
-                            Spacer(modifier = Modifier.weight(1f))
-
                             AnimatedVisibility(loading) {
-                                CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                                CircularProgressIndicator(
+                                    modifier = Modifier
+                                        .size(18.dp)
+                                        .padding(end = 8.dp)
+                                )
                             }
 
-                            PlaylistDownloadIcon(
-                                songs = songs.map { it.asMediaItem }.toImmutableList()
-                            )
-
-                            HeaderIconButton(
-                                icon = R.drawable.ellipsis_horizontal,
-                                color = colorPalette.text,
-                                onClick = {
-                                    menuState.display {
-                                        Menu {
-                                            playlist.browseId?.let { browseId ->
-                                                MenuEntry(
-                                                    icon = R.drawable.sync,
-                                                    text = stringResource(R.string.sync),
-                                                    enabled = !loading,
-                                                    onClick = {
-                                                        menuState.hide()
-                                                        coroutineScope.launch {
-                                                            loading = true
-                                                            sync(playlist, browseId)
-                                                            loading = false
-                                                        }
-                                                    }
-                                                )
-
-                                                songs.firstOrNull()?.id?.let { firstSongId ->
+                            // Glossy menu button (circle)
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color.White.copy(alpha = 0.15f))
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colorStops = arrayOf(
+                                                0.0f to Color.White.copy(alpha = 0.30f),
+                                                0.4f to Color.Transparent
+                                            )
+                                        )
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = Color.White.copy(alpha = 0.25f),
+                                        shape = RoundedCornerShape(50)
+                                    )
+                                    .shadow(4.dp, RoundedCornerShape(50))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        menuState.display {
+                                            Menu {
+                                                playlist.browseId?.let { browseId ->
                                                     MenuEntry(
-                                                        icon = R.drawable.play,
-                                                        text = stringResource(R.string.watch_playlist_on_youtube),
+                                                        icon = R.drawable.sync,
+                                                        text = stringResource(R.string.sync),
+                                                        enabled = !loading,
                                                         onClick = {
                                                             menuState.hide()
-                                                            binder?.player?.pause()
-                                                            uriHandler.openUri(
-                                                                "https://youtube.com/watch?v=$firstSongId&list=${
-                                                                    playlist.browseId.drop(2)
-                                                                }"
-                                                            )
-                                                        }
-                                                    )
-
-                                                    val errorMessage =
-                                                        stringResource(R.string.youtube_music_not_installed)
-                                                    MenuEntry(
-                                                        icon = R.drawable.musical_notes,
-                                                        text = stringResource(R.string.open_in_youtube_music),
-                                                        onClick = {
-                                                            menuState.hide()
-                                                            binder?.player?.pause()
-                                                            if (
-                                                                !launchYouTubeMusic(
-                                                                    context = context,
-                                                                    endpoint = "watch?v=$firstSongId&list=${
-                                                                        playlist.browseId.drop(2)
-                                                                    }"
-                                                                )
-                                                            ) {
-                                                                context.toast(errorMessage)
+                                                            coroutineScope.launch {
+                                                                loading = true
+                                                                sync(playlist, browseId)
+                                                                loading = false
                                                             }
                                                         }
                                                     )
+
+                                                    songs.firstOrNull()?.id?.let { firstSongId ->
+                                                        MenuEntry(
+                                                            icon = R.drawable.play,
+                                                            text = stringResource(R.string.watch_playlist_on_youtube),
+                                                            onClick = {
+                                                                menuState.hide()
+                                                                binder?.player?.pause()
+                                                                uriHandler.openUri(
+                                                                    "https://youtube.com/watch?v=$firstSongId&list=${
+                                                                        playlist.browseId.drop(2)
+                                                                    }"
+                                                                )
+                                                            }
+                                                        )
+
+                                                        val errorMessage =
+                                                            stringResource(R.string.youtube_music_not_installed)
+                                                        MenuEntry(
+                                                            icon = R.drawable.musical_notes,
+                                                            text = stringResource(R.string.open_in_youtube_music),
+                                                            onClick = {
+                                                                menuState.hide()
+                                                                binder?.player?.pause()
+                                                                if (
+                                                                    !launchYouTubeMusic(
+                                                                        context = context,
+                                                                        endpoint = "watch?v=$firstSongId&list=${
+                                                                            playlist.browseId.drop(2)
+                                                                        }"
+                                                                    )
+                                                                ) {
+                                                                    context.toast(errorMessage)
+                                                                }
+                                                            }
+                                                        )
+                                                    }
                                                 }
+
+                                                MenuEntry(
+                                                    icon = R.drawable.pencil,
+                                                    text = stringResource(R.string.rename),
+                                                    onClick = {
+                                                        menuState.hide()
+                                                        isRenaming = true
+                                                    }
+                                                )
+
+                                                MenuEntry(
+                                                    icon = R.drawable.disc,
+                                                    text = "Change cover",
+                                                    onClick = {
+                                                        menuState.hide()
+                                                        coverPickerLauncher.launch(
+                                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                        )
+                                                    }
+                                                )
+
+                                                MenuEntry(
+                                                    icon = R.drawable.trash,
+                                                    text = stringResource(R.string.delete),
+                                                    onClick = {
+                                                        menuState.hide()
+                                                        isDeleting = true
+                                                    }
+                                                )
                                             }
-
-                                            MenuEntry(
-                                                icon = R.drawable.pencil,
-                                                text = stringResource(R.string.rename),
-                                                onClick = {
-                                                    menuState.hide()
-                                                    isRenaming = true
-                                                }
-                                            )
-
-                                            MenuEntry(
-                                                icon = R.drawable.disc,
-                                                text = "Change cover",
-                                                onClick = {
-                                                    menuState.hide()
-                                                    coverPickerLauncher.launch(
-                                                        PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                                    )
-                                                }
-                                            )
-
-                                            MenuEntry(
-                                                icon = R.drawable.trash,
-                                                text = stringResource(R.string.delete),
-                                                onClick = {
-                                                    menuState.hide()
-                                                    isDeleting = true
-                                                }
-                                            )
                                         }
-                                    }
-                                }
-                            )
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.ellipsis_horizontal),
+                                    contentDescription = "Menu",
+                                    colorFilter = ColorFilter.tint(Color.White),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            }
                         }
 
-                        if (!isLandscape) thumbnailContent()
+                        Spacer(modifier = Modifier.height(16.dp))
+
+                        // ---- PLAYLIST NAME (large, centered, white) ----
+                        BasicText(
+                            text = playlist.name,
+                            style = typography.l.semiBold.copy(
+                                color = Color.White
+                            ),
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+
+                        // ---- Song count ----
+                        BasicText(
+                            text = "${songs.size} ${stringResource(R.string.songs)}",
+                            style = typography.xs.semiBold.copy(
+                                color = Color.White.copy(alpha = 0.6f)
+                            ),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(24.dp))
+
+                        // ---- CENTER BUTTONS: Shuffle, Play/Pause, Search ----
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(20.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            // Shuffle (circle, glossy)
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color.White.copy(alpha = 0.15f))
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colorStops = arrayOf(
+                                                0.0f to Color.White.copy(alpha = 0.30f),
+                                                0.4f to Color.Transparent
+                                            )
+                                        )
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = Color.White.copy(alpha = 0.25f),
+                                        shape = RoundedCornerShape(50)
+                                    )
+                                    .shadow(4.dp, RoundedCornerShape(50))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        if (songs.isNotEmpty()) {
+                                            binder?.stopRadio()
+                                            binder?.player?.forcePlayFromBeginning(
+                                                songs.shuffled().map { it.asMediaItem }
+                                            )
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.shuffle),
+                                    contentDescription = "Shuffle",
+                                    colorFilter = ColorFilter.tint(Color.White),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+
+                            // Play/Pause (large white pill button)
+                            Box(
+                                modifier = Modifier
+                                    .width(160.dp)
+                                    .height(52.dp)
+                                    .clip(RoundedCornerShape(26.dp))
+                                    .background(Color.White)
+                                    .shadow(6.dp, RoundedCornerShape(26.dp))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        if (songs.isNotEmpty()) {
+                                            if (playing) {
+                                                binder?.player?.pause()
+                                            } else {
+                                                binder?.stopRadio()
+                                                binder?.player?.forcePlayFromBeginning(
+                                                    songs.map { it.asMediaItem }
+                                                )
+                                            }
+                                        }
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Image(
+                                        painter = painterResource(
+                                            if (playing) R.drawable.pause else R.drawable.play
+                                        ),
+                                        contentDescription = if (playing) "Pause" else "Play",
+                                        colorFilter = ColorFilter.tint(colorPalette.background0),
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    BasicText(
+                                        text = if (playing) "Pause" else "Play",
+                                        style = typography.s.semiBold.copy(
+                                            color = colorPalette.background0
+                                        )
+                                    )
+                                }
+                            }
+
+                            // Search (circle, glossy — replaces download)
+                            Box(
+                                modifier = Modifier
+                                    .size(52.dp)
+                                    .clip(RoundedCornerShape(50))
+                                    .background(Color.White.copy(alpha = 0.15f))
+                                    .background(
+                                        Brush.verticalGradient(
+                                            colorStops = arrayOf(
+                                                0.0f to Color.White.copy(alpha = 0.30f),
+                                                0.4f to Color.Transparent
+                                            )
+                                        )
+                                    )
+                                    .border(
+                                        width = 1.dp,
+                                        color = Color.White.copy(alpha = 0.25f),
+                                        shape = RoundedCornerShape(50)
+                                    )
+                                    .shadow(4.dp, RoundedCornerShape(50))
+                                    .clickable(
+                                        interactionSource = remember { MutableInteractionSource() },
+                                        indication = null
+                                    ) {
+                                        // Search within playlist — opens search
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.search),
+                                    contentDescription = "Search",
+                                    colorFilter = ColorFilter.tint(Color.White),
+                                    modifier = Modifier.size(24.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(24.dp))
                     }
                 }
 
+                // ---- SONG LIST ----
                 itemsIndexed(
                     items = songs,
                     key = { _, song -> song.id },
@@ -347,20 +579,6 @@ fun LocalPlaylistSongs(
                 }
             }
         }
-
-        FloatingActionsContainerWithScrollToTop(
-            lazyListState = lazyListState,
-            icon = R.drawable.shuffle,
-            visible = !reorderingState.isDragging,
-            onClick = {
-                if (songs.isEmpty()) return@FloatingActionsContainerWithScrollToTop
-
-                binder?.stopRadio()
-                binder?.player?.forcePlayFromBeginning(
-                    songs.shuffled().map { it.asMediaItem }
-                )
-            }
-        )
     }
 }
 
