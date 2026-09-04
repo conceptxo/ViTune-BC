@@ -204,40 +204,38 @@ fun PlaylistItem(
 ) {
     val (colorPalette, typography, thumbnailShapeCorners) = LocalAppearance.current
 
-    // ---- TRUE GLASS MORPHISM CONTAINER ----
-    // Uses Modifier.blur() for actual backdrop blur (API 31+).
-    // The blur frosts whatever is behind the card, creating real glass.
-    // Multi-stop gradient simulates light refraction through glass.
+    // ---- GLASS MORPHISM CONTAINER ----
+    // NOTE: We do NOT use Modifier.blur() here — that would blur the card's
+    // OWN content (cover image + text). Instead, we use a translucent white
+    // gradient + border + shadow to SIMULATE the frosted glass look.
+    // The "blur" effect comes from the translucency — you see a frosted
+    // version of the background behind the card.
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(24.dp))
-            // Layer 1: Heavy backdrop blur (the "frosted glass" look)
-            // This blurs what's BEHIND the card.
-            .blur(24.dp)
-            // Layer 2: Translucent white fill with multi-stop gradient
-            // (top: brighter for light catch, middle: subtle, bottom: darker)
+            // Translucent white fill with multi-stop gradient (simulates glass)
             .background(
                 brush = Brush.verticalGradient(
                     colorStops = arrayOf(
-                        0.00f to Color.White.copy(alpha = 0.15f),
-                        0.30f to Color.White.copy(alpha = 0.08f),
-                        0.70f to Color.White.copy(alpha = 0.05f),
-                        1.00f to Color.White.copy(alpha = 0.12f)
+                        0.00f to Color.White.copy(alpha = 0.18f),
+                        0.40f to Color.White.copy(alpha = 0.10f),
+                        0.70f to Color.White.copy(alpha = 0.06f),
+                        1.00f to Color.White.copy(alpha = 0.14f)
                     )
                 )
             )
-            // Layer 3: White gradient border (top bright, bottom subtle)
+            // White gradient border (top bright, bottom subtle)
             .border(
                 width = 1.dp,
                 brush = Brush.verticalGradient(
                     colors = listOf(
-                        Color.White.copy(alpha = 0.4f),
-                        Color.White.copy(alpha = 0.1f)
+                        Color.White.copy(alpha = 0.45f),
+                        Color.White.copy(alpha = 0.12f)
                     )
                 ),
                 shape = RoundedCornerShape(24.dp)
             )
-            // Layer 4: Soft shadow for elevation
+            // Soft shadow for elevation
             .shadow(
                 elevation = 16.dp,
                 shape = RoundedCornerShape(24.dp),
@@ -279,8 +277,7 @@ fun PlaylistItem(
                 }
             }
 
-            // ---- PLAYLIST NAME (INSIDE the glass, directly below cover) ----
-            // Compact padding — name sits right below the cover.
+            // ---- PLAYLIST NAME (INSIDE glass, CENTERED, directly below cover) ----
             BasicText(
                 text = name.orEmpty(),
                 style = typography.xs.semiBold.let {
@@ -295,7 +292,9 @@ fun PlaylistItem(
                 ),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 8.dp)
             )
 
             // Channel name (if present)
@@ -310,7 +309,9 @@ fun PlaylistItem(
                 ),
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 10.dp, vertical = 2.dp)
             )
         }
     }
@@ -324,17 +325,16 @@ fun PlaylistItemPlaceholder(
 ) {
     val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
 
-    // Glass morphism placeholder (matches PlaylistItem)
+    // Glass morphism placeholder (matches PlaylistItem — NO blur on content)
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(24.dp))
-            .blur(24.dp)
             .background(
                 brush = Brush.verticalGradient(
                     colorStops = arrayOf(
-                        0.00f to Color.White.copy(alpha = 0.15f),
-                        0.50f to Color.White.copy(alpha = 0.06f),
-                        1.00f to Color.White.copy(alpha = 0.12f)
+                        0.00f to Color.White.copy(alpha = 0.18f),
+                        0.50f to Color.White.copy(alpha = 0.08f),
+                        1.00f to Color.White.copy(alpha = 0.14f)
                     )
                 )
             )
