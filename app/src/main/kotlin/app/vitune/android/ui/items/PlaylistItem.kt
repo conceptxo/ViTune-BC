@@ -6,6 +6,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -367,13 +368,4 @@ fun PlaylistItemPlaceholder(
 }
 
 // Local import to avoid breaking the existing ItemContainer/ItemInfoContainer references
-@Composable
-private fun Column(
-    modifier: Modifier = Modifier,
-    horizontalAlignment: Alignment.Horizontal = Alignment.Start,
-    content: @Composable () -> Unit
-) = androidx.compose.foundation.layout.Column(
-    modifier = modifier,
-    horizontalAlignment = horizontalAlignment,
-    content = content
-)
+// (Custom Column wrapper removed — using standard androidx.compose.foundation.layout.Column directly)
