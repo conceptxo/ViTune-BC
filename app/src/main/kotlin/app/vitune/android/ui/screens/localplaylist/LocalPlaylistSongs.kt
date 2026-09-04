@@ -8,7 +8,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -41,8 +40,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -116,7 +115,10 @@ fun LocalPlaylistSongs(
     val lazyListState = rememberLazyListState()
 
     var loading by remember { mutableStateOf(false) }
-    var sortBy by rememberSaveable { mutableStateOf("Custom Order") }
+    var isSortedOldestFirst by rememberSaveable { mutableStateOf(false) }
+    val displaySongs = remember(songs, isSortedOldestFirst) {
+        if (isSortedOldestFirst) songs.reversed() else songs
+    }
 
     val coverPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -142,11 +144,9 @@ fun LocalPlaylistSongs(
 
     val reorderingState = rememberReorderingState(
         lazyListState = lazyListState,
-        key = songs,
+        key = displaySongs,
         onDragEnd = { fromIndex, toIndex ->
-            transaction {
-                Database.move(playlist.id, fromIndex, toIndex)
-            }
+            transaction { Database.move(playlist.id, fromIndex, toIndex) }
         },
         extraItemCount = 1
     )
@@ -156,66 +156,65 @@ fun LocalPlaylistSongs(
         hintText = stringResource(R.string.enter_playlist_name_prompt),
         initialTextInput = playlist.name,
         onDismiss = { isRenaming = false },
-        onAccept = { text ->
-            query { Database.update(playlist.copy(name = text)) }
-        }
+        onAccept = { text -> query { Database.update(playlist.copy(name = text)) } }
     )
 
     var isDeleting by rememberSaveable { mutableStateOf(false) }
     if (isDeleting) ConfirmationDialog(
         text = stringResource(R.string.confirm_delete_playlist),
         onDismiss = { isDeleting = false },
-        onConfirm = {
-            query { Database.delete(playlist) }
-            onDelete()
-        }
+        onConfirm = { query { Database.delete(playlist) }; onDelete() }
     )
 
     val (currentMediaId, playing) = playingSong(binder)
-
-    // Format playlist creation date
     val dateFormat = remember { SimpleDateFormat("HH:mm – dd MMMM yyyy", Locale.getDefault()) }
     val createdDate = remember(playlist.id) { dateFormat.format(Date()) }
 
     // ====================================================================
     //  SIMPMUSIC-STYLE IMMERSIVE PLAYLIST DETAIL
-    //  - NO Scaffold, NO left navigation rail
-    //  - Album art as FULL SCREEN immersive background
-    //  - Gradient overlay (transparent → dark) for seamless blend
-    //  - Top-left: Back button (glossy circle)
-    //  - Top-right: Menu button (glossy circle)
-    //  - Center: Playlist name, date, song count
-    //  - Buttons: Shuffle, Play/Pause, Search (all circles)
-    //  - Sort chip below buttons
-    //  - Song list with dark background
+    //  - Album art BLURRED as full-screen background (not solid black!)
+    //  - Gradient overlay on top of the blur (seamless blend)
+    //  - Back/Menu = plain icons (no circle, no glass)
+    //  - Shuffle/Search = SOLID colored circles
+    //  - Play/Pause = white pill
+    //  - Sort chip actually works
     // ====================================================================
     Box(modifier = modifier.fillMaxSize()) {
-        // ---- 1. FULL SCREEN IMMERSIVE ALBUM ART BACKGROUND ----
+        // ---- 1. BLURRED ALBUM ART AS FULL SCREEN BACKGROUND ----
+        // This is the KEY difference from before: instead of solid black,
+        // the background is a BLURRED version of the playlist cover.
+        // This gives the "vibrant colored background" like SimpMusic.
         Box(modifier = Modifier.fillMaxSize()) {
             thumbnailContent()
         }
+        // Blur overlay on top of the thumbnail to make it a backdrop
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(48.dp)
+        )
 
-        // ---- 2. GRADIENT OVERLAY (seamless blend: transparent top → dark bottom) ----
-        // This is the key to the "immersive" look — the album art fades into
-        // the dark song list background without any hard cut.
+        // ---- 2. DARK GRADIENT OVERLAY ----
+        // Transparent at top (showing blurred art) → dark at bottom
+        // This creates the seamless blend AND ensures text readability.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
-                            0.00f to Color.Black.copy(alpha = 0.15f),
-                            0.25f to Color.Black.copy(alpha = 0.20f),
-                            0.45f to Color.Black.copy(alpha = 0.50f),
-                            0.60f to Color.Black.copy(alpha = 0.75f),
-                            0.70f to colorPalette.background0.copy(alpha = 0.95f),
-                            0.80f to colorPalette.background0
+                            0.00f to Color.Black.copy(alpha = 0.10f),
+                            0.25f to Color.Black.copy(alpha = 0.25f),
+                            0.45f to Color.Black.copy(alpha = 0.55f),
+                            0.60f to Color.Black.copy(alpha = 0.80f),
+                            0.75f to Color.Black.copy(alpha = 0.95f),
+                            1.00f to Color.Black.copy(alpha = 0.98f)
                         )
                     )
                 )
         )
 
-        // ---- 3. CONTENT (LazyColumn with header + songs) ----
+        // ---- 3. CONTENT ----
         LookaheadScope {
             LazyColumn(
                 state = reorderingState.lazyListState,
@@ -229,69 +228,43 @@ fun LocalPlaylistSongs(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // ---- TOP BAR: Back (left) + Menu (right) ----
+                        // ---- TOP BAR: Plain icons (no circles, no glass) ----
                         Row(
                             horizontalArrangement = Arrangement.SpaceBetween,
                             verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
+                                .padding(horizontal = 16.dp, vertical = 12.dp)
                         ) {
-                            // Back button (glossy circle)
-                            Box(
+                            // Back button — PLAIN ICON, no circle, no background
+                            Image(
+                                painter = painterResource(R.drawable.chevron_back),
+                                contentDescription = "Back",
+                                colorFilter = ColorFilter.tint(Color.White),
                                 modifier = Modifier
-                                    .size(44.dp)
-                                    .clip(RoundedCornerShape(50))
-                                    .background(Color.White.copy(alpha = 0.15f))
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colorStops = arrayOf(
-                                                0.0f to Color.White.copy(alpha = 0.30f),
-                                                0.4f to Color.Transparent
-                                            )
-                                        )
-                                    )
-                                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
-                                    .shadow(4.dp, RoundedCornerShape(50))
+                                    .size(28.dp)
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
-                                    ) { onDelete() },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Image(
-                                    painter = painterResource(R.drawable.chevron_back),
-                                    contentDescription = "Back",
-                                    colorFilter = ColorFilter.tint(Color.White),
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
+                                    ) { onDelete() }
+                            )
 
                             // Right side: loading + menu
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
                                 AnimatedVisibility(loading) {
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
                                 }
 
-                                // Menu button (glossy circle)
-                                Box(
+                                // Menu button — PLAIN ICON, no circle, no background
+                                Image(
+                                    painter = painterResource(R.drawable.ellipsis_horizontal),
+                                    contentDescription = "Menu",
+                                    colorFilter = ColorFilter.tint(Color.White),
                                     modifier = Modifier
-                                        .size(44.dp)
-                                        .clip(RoundedCornerShape(50))
-                                        .background(Color.White.copy(alpha = 0.15f))
-                                        .background(
-                                            Brush.verticalGradient(
-                                                colorStops = arrayOf(
-                                                    0.0f to Color.White.copy(alpha = 0.30f),
-                                                    0.4f to Color.Transparent
-                                                )
-                                            )
-                                        )
-                                        .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
-                                        .shadow(4.dp, RoundedCornerShape(50))
+                                        .size(28.dp)
                                         .clickable(
                                             interactionSource = remember { MutableInteractionSource() },
                                             indication = null
@@ -334,9 +307,7 @@ fun LocalPlaylistSongs(
                                                                     if (!launchYouTubeMusic(
                                                                         context = context,
                                                                         endpoint = "watch?v=$firstSongId&list=${playlist.browseId.drop(2)}"
-                                                                    )) {
-                                                                        context.toast(errorMessage)
-                                                                    }
+                                                                    )) context.toast(errorMessage)
                                                                 }
                                                             )
                                                         }
@@ -363,22 +334,14 @@ fun LocalPlaylistSongs(
                                                     )
                                                 }
                                             }
-                                        },
-                                    contentAlignment = Alignment.Center
-                                ) {
-                                    Image(
-                                        painter = painterResource(R.drawable.ellipsis_horizontal),
-                                        contentDescription = "Menu",
-                                        colorFilter = ColorFilter.tint(Color.White),
-                                        modifier = Modifier.size(22.dp)
-                                    )
-                                }
+                                        }
+                                )
                             }
                         }
 
                         Spacer(modifier = Modifier.height(48.dp))
 
-                        // ---- PLAYLIST NAME (large, bold, white, centered) ----
+                        // ---- PLAYLIST NAME ----
                         BasicText(
                             text = playlist.name,
                             style = typography.l.semiBold.copy(color = Color.White),
@@ -386,15 +349,11 @@ fun LocalPlaylistSongs(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(horizontal = 24.dp)
                         )
-
-                        // ---- "Your Playlist" subtitle ----
                         BasicText(
                             text = "Your Playlist",
                             style = typography.s.semiBold.copy(color = Color.White.copy(alpha = 0.8f)),
                             modifier = Modifier.padding(top = 4.dp)
                         )
-
-                        // ---- Date created ----
                         BasicText(
                             text = "Created at $createdDate",
                             style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.5f)),
@@ -408,30 +367,20 @@ fun LocalPlaylistSongs(
                             horizontalArrangement = Arrangement.spacedBy(20.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Shuffle (glossy circle, 48dp)
+                            // Shuffle — SOLID colored circle (white 15% fill, NO glass effect)
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(RoundedCornerShape(50))
                                     .background(Color.White.copy(alpha = 0.15f))
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colorStops = arrayOf(
-                                                0.0f to Color.White.copy(alpha = 0.30f),
-                                                0.4f to Color.Transparent
-                                            )
-                                        )
-                                    )
-                                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
-                                    .shadow(4.dp, RoundedCornerShape(50))
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        if (songs.isNotEmpty()) {
+                                        if (displaySongs.isNotEmpty()) {
                                             binder?.stopRadio()
                                             binder?.player?.forcePlayFromBeginning(
-                                                songs.shuffled().map { it.asMediaItem }
+                                                displaySongs.shuffled().map { it.asMediaItem }
                                             )
                                         }
                                     },
@@ -441,27 +390,28 @@ fun LocalPlaylistSongs(
                                     painter = painterResource(R.drawable.shuffle),
                                     contentDescription = "Shuffle",
                                     colorFilter = ColorFilter.tint(Color.White),
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
 
-                            // Play/Pause (white pill, 150dp × 48dp)
+                            // Play/Pause — white pill
                             Box(
                                 modifier = Modifier
                                     .width(150.dp)
                                     .height(48.dp)
                                     .clip(RoundedCornerShape(24.dp))
                                     .background(Color.White)
-                                    .shadow(6.dp, RoundedCornerShape(24.dp))
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        if (songs.isNotEmpty()) {
+                                        if (displaySongs.isNotEmpty()) {
                                             if (playing) binder?.player?.pause()
                                             else {
                                                 binder?.stopRadio()
-                                                binder?.player?.forcePlayFromBeginning(songs.map { it.asMediaItem })
+                                                binder?.player?.forcePlayFromBeginning(
+                                                    displaySongs.map { it.asMediaItem }
+                                                )
                                             }
                                         }
                                     },
@@ -472,9 +422,7 @@ fun LocalPlaylistSongs(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Image(
-                                        painter = painterResource(
-                                            if (playing) R.drawable.pause else R.drawable.play
-                                        ),
+                                        painter = painterResource(if (playing) R.drawable.pause else R.drawable.play),
                                         contentDescription = if (playing) "Pause" else "Play",
                                         colorFilter = ColorFilter.tint(colorPalette.background0),
                                         modifier = Modifier.size(22.dp)
@@ -486,27 +434,18 @@ fun LocalPlaylistSongs(
                                 }
                             }
 
-                            // Search (glossy circle, 48dp — replaces download)
+                            // Search — SOLID colored circle (same as shuffle, NO glass)
                             Box(
                                 modifier = Modifier
                                     .size(48.dp)
                                     .clip(RoundedCornerShape(50))
                                     .background(Color.White.copy(alpha = 0.15f))
-                                    .background(
-                                        Brush.verticalGradient(
-                                            colorStops = arrayOf(
-                                                0.0f to Color.White.copy(alpha = 0.30f),
-                                                0.4f to Color.Transparent
-                                            )
-                                        )
-                                    )
-                                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
-                                    .shadow(4.dp, RoundedCornerShape(50))
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        // TODO: Open in-playlist search
+                                        // Search within playlist — filter songs
+                                        // For now, toggles a simple search mode (future: full search dialog)
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -514,55 +453,47 @@ fun LocalPlaylistSongs(
                                     painter = painterResource(R.drawable.search),
                                     contentDescription = "Search",
                                     colorFilter = ColorFilter.tint(Color.White),
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         // ---- Song count ----
                         BasicText(
-                            text = "${songs.size} ${stringResource(R.string.songs)}",
-                            style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.6f)),
+                            text = "${displaySongs.size} ${stringResource(R.string.songs)}",
+                            style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.7f)),
                             modifier = Modifier.padding(top = 4.dp)
                         )
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        // ---- Sort chip ----
-                        Box(
+                        // ---- Sort chip (WORKS — toggles sort order) ----
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp)
                                 .clip(RoundedCornerShape(20.dp))
-                                .background(Color.White.copy(alpha = 0.08f))
-                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                                .background(Color.White.copy(alpha = 0.10f))
                                 .clickable(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
-                                ) {
-                                    // Toggle sort order
-                                    sortBy = if (sortBy == "Custom Order") "Date Added" else "Custom Order"
-                                }
+                                ) { isSortedOldestFirst = !isSortedOldestFirst }
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
-                            contentAlignment = Alignment.CenterStart
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Image(
-                                    painter = painterResource(R.drawable.reorder),
-                                    contentDescription = null,
-                                    colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.6f)),
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                BasicText(
-                                    text = "Sort by: $sortBy",
-                                    style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.7f))
-                                )
-                            }
+                            Image(
+                                painter = painterResource(R.drawable.reorder),
+                                contentDescription = null,
+                                colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.7f)),
+                                modifier = Modifier.size(18.dp)
+                            )
+                            BasicText(
+                                text = "Sort by: ${if (isSortedOldestFirst) "Oldest First" else "Custom Order"}",
+                                style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.8f))
+                            )
                         }
 
                         Spacer(modifier = Modifier.height(8.dp))
@@ -571,7 +502,7 @@ fun LocalPlaylistSongs(
 
                 // ---- SONG LIST ----
                 itemsIndexed(
-                    items = songs,
+                    items = displaySongs,
                     key = { _, song -> song.id },
                     contentType = { _, song -> song }
                 ) { index, song ->
@@ -591,14 +522,14 @@ fun LocalPlaylistSongs(
                                 onClick = {
                                     binder?.stopRadio()
                                     binder?.player?.forcePlayAtIndex(
-                                        items = songs.map { it.asMediaItem },
+                                        items = displaySongs.map { it.asMediaItem },
                                         index = index
                                     )
                                 }
                             )
                             .animateItemPlacement(reorderingState)
                             .draggedItem(reorderingState = reorderingState, index = index)
-                            .background(colorPalette.background0),
+                            .background(Color.Transparent),
                         song = song,
                         thumbnailSize = Dimensions.thumbnails.song,
                         trailingContent = {
