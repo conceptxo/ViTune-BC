@@ -1,7 +1,6 @@
 package app.vitune.android.ui.screens.home
 
 import androidx.annotation.DrawableRes
-import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -34,7 +33,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -45,15 +43,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.vitune.android.Database
 import app.vitune.android.LocalPlayerAwareWindowInsets
-import app.vitune.android.LocalPlayerServiceBinder
 import app.vitune.android.R
 import app.vitune.android.models.PipedSession
 import app.vitune.android.models.Playlist
@@ -74,7 +69,6 @@ import app.vitune.android.ui.screens.builtinplaylist.BuiltInPlaylistScreen
 import app.vitune.android.ui.screens.settings.SettingsEntryGroupText
 import app.vitune.android.ui.screens.settings.SettingsGroupSpacer
 import app.vitune.android.utils.semiBold
-import app.vitune.android.utils.thumbnail
 import app.vitune.compose.persist.persist
 import app.vitune.compose.persist.persistList
 import app.vitune.core.data.enums.BuiltInPlaylist
@@ -82,19 +76,10 @@ import app.vitune.core.data.enums.PlaylistSortBy
 import app.vitune.core.data.enums.SortOrder
 import app.vitune.core.ui.Dimensions
 import app.vitune.core.ui.LocalAppearance
-import app.vitune.core.ui.utils.px
 import app.vitune.providers.piped.Piped
 import app.vitune.providers.piped.models.Session
-import coil3.SingletonImageLoader
-import coil3.request.ImageRequest
-import coil3.request.allowHardware
-import coil3.request.crossfade
-import coil3.toBitmap
-import androidx.palette.graphics.Palette
 import kotlinx.collections.immutable.toImmutableList
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
-import kotlinx.coroutines.withContext
 import app.vitune.providers.piped.models.PlaylistPreview as PipedPlaylistPreview
 
 @Route
@@ -106,55 +91,6 @@ fun HomePlaylists(
     onSearchClick: () -> Unit
 ) = with(OrderPreferences) {
     val (colorPalette) = LocalAppearance.current
-    val context = LocalContext.current
-    val binder = LocalPlayerServiceBinder.current
-
-    // ---- DYNAMIC GRADIENT BACKGROUND (changes with current song) ----
-    // Extracts colors from the currently playing song's album art and
-    // creates a smooth animated gradient background. This makes the glass
-    // morphism effect on the playlist cards actually visible.
-    var bgColors by remember { mutableStateOf(listOf(Color(0xFF1A1A2E), Color(0xFF16213E))) }
-    val currentMediaItem = binder?.player?.currentMediaItem
-    LaunchedEffect(currentMediaItem?.mediaId) {
-        val artworkUri = currentMediaItem?.mediaMetadata?.artworkUri?.toString()
-        if (artworkUri != null) {
-            withContext(Dispatchers.IO) {
-                runCatching {
-                    val request = ImageRequest.Builder(context)
-                        .data(artworkUri)
-                        .size(128)
-                        .allowHardware(false)
-                        .build()
-                    val result = SingletonImageLoader.get(context).execute(request)
-                    val bitmap = (result as? coil3.request.SuccessResult)?.image?.toBitmap()
-                    if (bitmap != null) {
-                        val palette = Palette.from(bitmap)
-                            .maximumColorCount(8)
-                            .generate()
-                        val colors = palette.swatches
-                            .sortedByDescending { it.population }
-                            .map { Color(it.rgb) }
-                            .distinct()
-                            .take(2)
-                        if (colors.isNotEmpty()) {
-                            bgColors = colors
-                        }
-                    }
-                }
-            }
-        }
-    }
-    // Smooth animated crossfade (800ms — buttery smooth)
-    val animatedTopColor by animateColorAsState(
-        targetValue = bgColors.getOrElse(0) { Color(0xFF1A1A2E) },
-        animationSpec = tween(durationMillis = 800),
-        label = "bgGradientTop"
-    )
-    val animatedBottomColor by animateColorAsState(
-        targetValue = bgColors.getOrElse(1) { Color(0xFF16213E) },
-        animationSpec = tween(durationMillis = 800),
-        label = "bgGradientBottom"
-    )
 
     var isCreatingANewPlaylist by rememberSaveable { mutableStateOf(false) }
 
@@ -196,19 +132,7 @@ fun HomePlaylists(
 
     val builtInPlaylists by BuiltInPlaylistScreen.shownPlaylistsAsState()
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(
-                Brush.verticalGradient(
-                    colors = listOf(
-                        animatedTopColor,
-                        animatedBottomColor,
-                        animatedBottomColor.copy(alpha = 0.9f)
-                    )
-                )
-            )
-    ) {
+    Box {
         LazyVerticalGrid(
             state = lazyGridState,
             columns = if (UIStatePreferences.playlistsAsGrid)
@@ -223,7 +147,7 @@ fun HomePlaylists(
             else Arrangement.Top,
             modifier = Modifier
                 .fillMaxSize()
-                .background(Color.Transparent)  // Transparent so gradient shows through
+                .background(colorPalette.background0)
         ) {
             item(key = "header", contentType = 0, span = { GridItemSpan(maxLineSpan) }) {
                 Header(title = stringResource(R.string.playlists)) {
@@ -441,37 +365,30 @@ fun FluidInterlockingPlaylistPill(
         )
     }
 
-    // ---- GLASS MORPHISM for built-in playlist buttons ----
-    // Each pill uses: translucent fill + subtle border + shadow.
-    // NO Modifier.blur() — that would blur the icon and text inside.
-    // The colored tint creates a subtle colored glow (red for Favorites, etc.)
+    // ---- SUBTLE GLASS for built-in playlist buttons ----
+    // Same style as playlist cards: 5% white fill + 20% white border.
+    // Color tint adds a subtle colored glow (red for Favorites, etc.)
     Row(
         modifier = modifier
             .fillMaxWidth()
             .height(60.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(
                 brush = Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.00f to colorTint.copy(alpha = 0.20f),
-                        0.50f to Color.White.copy(alpha = 0.08f),
-                        1.00f to colorTint.copy(alpha = 0.14f)
+                    colors = listOf(
+                        colorTint.copy(alpha = 0.12f),
+                        Color.White.copy(alpha = 0.05f)
                     )
                 )
             )
             .border(
                 width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.35f),
-                        colorTint.copy(alpha = 0.2f)
-                    )
-                ),
-                shape = RoundedCornerShape(24.dp)
+                color = Color.White.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(20.dp)
             )
             .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(24.dp),
+                elevation = 6.dp,
+                shape = RoundedCornerShape(20.dp),
                 clip = false
             )
             .clickable(onClick = onClick)
