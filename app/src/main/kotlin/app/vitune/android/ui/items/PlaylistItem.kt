@@ -23,13 +23,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.Shadow
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,15 +57,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
-
-// ====================================================================
-//  LIQUID GLASS PLAYLIST ITEM (Apple iOS 26 / Vision Pro style)
-//  - Entire card is a frosted glass container with subtle blur
-//  - Playlist cover sits on top, slightly raised (with shadow)
-//  - Playlist name floats on the glass below the cover
-//  - Glossy white highlight on top edge for "wet glass" feel
-//  - Interlocking-friendly rounded corners (squircle-like)
-// ====================================================================
 
 @Composable
 fun PlaylistItem(
@@ -190,7 +181,11 @@ fun PlaylistItem(
 )
 
 // ====================================================================
-//  MAIN PLAYLIST ITEM — Liquid Glass Edition
+//  MAIN PLAYLIST ITEM — Subtle Glass Edition
+//  - VERY subtle glass (5% white — barely visible, not a "rectangle")
+//  - Thin white border (20% — glass edge highlight)
+//  - Cover image with shadow for depth
+//  - Playlist name CENTERED below cover, tight
 // ====================================================================
 @Composable
 fun PlaylistItem(
@@ -204,49 +199,24 @@ fun PlaylistItem(
 ) {
     val (colorPalette, typography, thumbnailShapeCorners) = LocalAppearance.current
 
-    // ---- GLASS MORPHISM CONTAINER ----
-    // NOTE: We do NOT use Modifier.blur() here — that would blur the card's
-    // OWN content (cover image + text). Instead, we use a translucent white
-    // gradient + border + shadow to SIMULATE the frosted glass look.
-    // The "blur" effect comes from the translucency — you see a frosted
-    // version of the background behind the card.
+    // ---- SUBTLE GLASS CONTAINER ----
+    // Very low alpha (5%) so it looks like frosted glass, NOT a grey rectangle.
+    // The thin white border (20%) creates the "glass edge" without a visible fill.
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            // Translucent white fill with multi-stop gradient (simulates glass)
-            .background(
-                brush = Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.00f to Color.White.copy(alpha = 0.18f),
-                        0.40f to Color.White.copy(alpha = 0.10f),
-                        0.70f to Color.White.copy(alpha = 0.06f),
-                        1.00f to Color.White.copy(alpha = 0.14f)
-                    )
-                )
-            )
-            // White gradient border (top bright, bottom subtle)
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.05f))
             .border(
                 width = 1.dp,
-                brush = Brush.verticalGradient(
-                    colors = listOf(
-                        Color.White.copy(alpha = 0.45f),
-                        Color.White.copy(alpha = 0.12f)
-                    )
-                ),
-                shape = RoundedCornerShape(24.dp)
-            )
-            // Soft shadow for elevation
-            .shadow(
-                elevation = 16.dp,
-                shape = RoundedCornerShape(24.dp),
-                clip = false
+                color = Color.White.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(20.dp)
             )
     ) {
         Column(
-            horizontalAlignment = if (alternative) Alignment.CenterHorizontally else Alignment.Start,
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
         ) {
-            // ---- PLAYLIST COVER (image, inside the glass) ----
+            // ---- PLAYLIST COVER (with shadow) ----
             Box(
                 modifier = Modifier
                     .then(
@@ -255,10 +225,14 @@ fun PlaylistItem(
                     )
                     .padding(6.dp)
                     .clip(RoundedCornerShape(14.dp))
+                    .shadow(
+                        elevation = 8.dp,
+                        shape = RoundedCornerShape(14.dp),
+                        clip = false
+                    )
             ) {
                 thumbnailContent(Modifier.fillMaxSize())
 
-                // Song count badge
                 songCount?.let {
                     BasicText(
                         text = "$songCount",
@@ -277,18 +251,15 @@ fun PlaylistItem(
                 }
             }
 
-            // ---- PLAYLIST NAME (INSIDE glass, CENTERED, directly below cover) ----
-            // Tight padding — name sits RIGHT below the cover, minimal gap.
+            // ---- PLAYLIST NAME (CENTERED, directly below cover, tight) ----
             BasicText(
                 text = name.orEmpty(),
-                style = typography.xs.semiBold.let {
-                    if (alternative && channelName.isNullOrBlank()) it.center else it
-                }.copy(
+                style = typography.xs.semiBold.center.copy(
                     color = colorPalette.text,
-                    shadow = androidx.compose.ui.graphics.Shadow(
-                        color = Color.Black.copy(alpha = 0.6f),
-                        blurRadius = 4f,
-                        offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                    shadow = Shadow(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        blurRadius = 3f,
+                        offset = Offset(1f, 1f)
                     )
                 ),
                 maxLines = 2,
@@ -298,14 +269,13 @@ fun PlaylistItem(
                     .padding(horizontal = 8.dp, vertical = 4.dp)
             )
 
-            // Channel name (if present)
             if (channelName?.isNotBlank() == true) BasicText(
                 text = channelName,
                 style = typography.xs.semiBold.secondary.copy(
-                    shadow = androidx.compose.ui.graphics.Shadow(
+                    shadow = Shadow(
                         color = Color.Black.copy(alpha = 0.4f),
                         blurRadius = 2f,
-                        offset = androidx.compose.ui.geometry.Offset(1f, 1f)
+                        offset = Offset(1f, 1f)
                     )
                 ),
                 maxLines = 2,
@@ -326,47 +296,31 @@ fun PlaylistItemPlaceholder(
 ) {
     val (colorPalette, _, _, thumbnailShape) = LocalAppearance.current
 
-    // Glass morphism placeholder (matches PlaylistItem — NO blur on content)
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(24.dp))
-            .background(
-                brush = Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.00f to Color.White.copy(alpha = 0.18f),
-                        0.50f to Color.White.copy(alpha = 0.08f),
-                        1.00f to Color.White.copy(alpha = 0.14f)
-                    )
-                )
-            )
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.05f))
             .border(
                 width = 1.dp,
-                color = Color.White.copy(alpha = 0.25f),
-                shape = RoundedCornerShape(24.dp)
+                color = Color.White.copy(alpha = 0.2f),
+                shape = RoundedCornerShape(20.dp)
             )
     ) {
         Column(
-            horizontalAlignment = if (alternative) Alignment.CenterHorizontally else Alignment.Start,
+            horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier.fillMaxWidth()
         ) {
-            // Cover placeholder (inside glass)
             Spacer(
                 modifier = Modifier
                     .then(
                         if (alternative) Modifier.fillMaxWidth().aspectRatio(1f)
                         else Modifier.requiredSize(thumbnailSize)
                     )
-                    .padding(10.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .padding(6.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(color = colorPalette.shimmer)
             )
-
-            // Text placeholders (inside glass, compact)
-            TextPlaceholder(modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
-            TextPlaceholder(modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp))
+            TextPlaceholder(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
         }
     }
 }
-
-// Local import to avoid breaking the existing ItemContainer/ItemInfoContainer references
-// (Custom Column wrapper removed — using standard androidx.compose.foundation.layout.Column directly)
