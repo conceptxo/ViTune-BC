@@ -125,14 +125,14 @@ fun LocalPlaylistSongs(
 
     // Filter + sort songs
     val displaySongs = remember(songs, isSortedOldestFirst, searchQuery, isSearching) {
-        var result = songs
+        var result: ImmutableList<Song> = songs
         if (isSearching && searchQuery.isNotBlank()) {
             result = songs.filter {
                 it.title.contains(searchQuery, ignoreCase = true) ||
                 it.artistsText?.contains(searchQuery, ignoreCase = true) == true
-            }
+            }.toImmutableList()
         }
-        if (isSortedOldestFirst) result.reversed() else result
+        if (isSortedOldestFirst) result.reversed().toImmutableList() else result
     }
 
     val coverPickerLauncher = rememberLauncherForActivityResult(
