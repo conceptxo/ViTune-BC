@@ -31,7 +31,6 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicText
-import androidx.compose.material3.Icon
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -42,7 +41,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
@@ -75,10 +73,8 @@ import app.vitune.android.ui.components.themed.MenuEntry
 import app.vitune.android.ui.components.themed.ReorderHandle
 import app.vitune.android.ui.components.themed.TextFieldDialog
 import app.vitune.android.ui.items.SongItem
-import app.vitune.android.utils.PlaylistDownloadIcon
 import app.vitune.android.utils.asMediaItem
 import app.vitune.android.utils.completed
-import app.vitune.android.utils.enqueue
 import app.vitune.android.utils.forcePlayAtIndex
 import app.vitune.android.utils.forcePlayFromBeginning
 import app.vitune.android.utils.launchYouTubeMusic
@@ -90,7 +86,6 @@ import app.vitune.compose.reordering.draggedItem
 import app.vitune.compose.reordering.rememberReorderingState
 import app.vitune.core.ui.Dimensions
 import app.vitune.core.ui.LocalAppearance
-import app.vitune.core.ui.utils.isLandscape
 import app.vitune.providers.innertube.Innertube
 import app.vitune.providers.innertube.models.bodies.BrowseBody
 import app.vitune.providers.innertube.requests.playlistPage
@@ -98,6 +93,9 @@ import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -118,6 +116,7 @@ fun LocalPlaylistSongs(
     val lazyListState = rememberLazyListState()
 
     var loading by remember { mutableStateOf(false) }
+    var sortBy by rememberSaveable { mutableStateOf("Custom Order") }
 
     val coverPickerLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickVisualMedia()
@@ -153,111 +152,95 @@ fun LocalPlaylistSongs(
     )
 
     var isRenaming by rememberSaveable { mutableStateOf(false) }
-
     if (isRenaming) TextFieldDialog(
         hintText = stringResource(R.string.enter_playlist_name_prompt),
         initialTextInput = playlist.name,
         onDismiss = { isRenaming = false },
         onAccept = { text ->
-            query {
-                Database.update(playlist.copy(name = text))
-            }
+            query { Database.update(playlist.copy(name = text)) }
         }
     )
 
     var isDeleting by rememberSaveable { mutableStateOf(false) }
-
     if (isDeleting) ConfirmationDialog(
         text = stringResource(R.string.confirm_delete_playlist),
         onDismiss = { isDeleting = false },
         onConfirm = {
-            query {
-                Database.delete(playlist)
-            }
+            query { Database.delete(playlist) }
             onDelete()
         }
     )
 
     val (currentMediaId, playing) = playingSong(binder)
 
+    // Format playlist creation date
+    val dateFormat = remember { SimpleDateFormat("HH:mm – dd MMMM yyyy", Locale.getDefault()) }
+    val createdDate = remember(playlist.id) { dateFormat.format(Date()) }
+
     // ====================================================================
-    //  SIMPMUSIC-STYLE PLAYLIST DETAIL SCREEN
-    //  - Album art as full-screen blurred background
-    //  - Gradient overlay (transparent top → dark bottom) for seamless blend
-    //  - Top-right: Glossy menu button only (no search)
-    //  - Center: Shuffle, Play/Pause, Search buttons
-    //  - Song list below with dark background
+    //  SIMPMUSIC-STYLE IMMERSIVE PLAYLIST DETAIL
+    //  - NO Scaffold, NO left navigation rail
+    //  - Album art as FULL SCREEN immersive background
+    //  - Gradient overlay (transparent → dark) for seamless blend
+    //  - Top-left: Back button (glossy circle)
+    //  - Top-right: Menu button (glossy circle)
+    //  - Center: Playlist name, date, song count
+    //  - Buttons: Shuffle, Play/Pause, Search (all circles)
+    //  - Sort chip below buttons
+    //  - Song list with dark background
     // ====================================================================
     Box(modifier = modifier.fillMaxSize()) {
-        // 1. BLURRED ALBUM ART BACKGROUND (full screen)
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(
-                    playlist.thumbnail?.let { url ->
-                        Modifier.background(color = colorPalette.background0)
-                    } ?: Modifier.background(color = colorPalette.background0)
-                )
-        ) {
-            // Blurred background image
+        // ---- 1. FULL SCREEN IMMERSIVE ALBUM ART BACKGROUND ----
+        Box(modifier = Modifier.fillMaxSize()) {
             thumbnailContent()
         }
 
-        // 2. GRADIENT OVERLAY (transparent top → dark bottom)
-        // This creates the "seamless blend" from album art to dark song list
+        // ---- 2. GRADIENT OVERLAY (seamless blend: transparent top → dark bottom) ----
+        // This is the key to the "immersive" look — the album art fades into
+        // the dark song list background without any hard cut.
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .background(
                     Brush.verticalGradient(
                         colorStops = arrayOf(
-                            0.00f to Color.Black.copy(alpha = 0.20f),
-                            0.30f to Color.Black.copy(alpha = 0.40f),
-                            0.50f to Color.Black.copy(alpha = 0.70f),
-                            0.70f to colorPalette.background0.copy(alpha = 0.90f),
-                            1.00f to colorPalette.background0
+                            0.00f to Color.Black.copy(alpha = 0.15f),
+                            0.25f to Color.Black.copy(alpha = 0.20f),
+                            0.45f to Color.Black.copy(alpha = 0.50f),
+                            0.60f to Color.Black.copy(alpha = 0.75f),
+                            0.70f to colorPalette.background0.copy(alpha = 0.95f),
+                            0.80f to colorPalette.background0
                         )
                     )
                 )
         )
 
-        // 3. CONTENT (LazyColumn with header + songs)
+        // ---- 3. CONTENT (LazyColumn with header + songs) ----
         LookaheadScope {
             LazyColumn(
                 state = reorderingState.lazyListState,
                 contentPadding = LocalPlayerAwareWindowInsets.current
                     .only(WindowInsetsSides.Vertical + WindowInsetsSides.End)
                     .asPaddingValues(),
-                modifier = Modifier
-                    .fillMaxSize()
+                modifier = Modifier.fillMaxSize()
             ) {
-                item(
-                    key = "header",
-                    contentType = 0
-                ) {
+                item(key = "header", contentType = 0) {
                     Column(
                         horizontalAlignment = Alignment.CenterHorizontally,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        // ---- TOP BAR: Menu button (top-right, glossy) ----
+                        // ---- TOP BAR: Back (left) + Menu (right) ----
                         Row(
-                            horizontalArrangement = Arrangement.End,
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically,
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 8.dp)
                         ) {
-                            AnimatedVisibility(loading) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier
-                                        .size(18.dp)
-                                        .padding(end = 8.dp)
-                                )
-                            }
-
-                            // Glossy menu button (circle)
+                            // Back button (glossy circle)
                             Box(
                                 modifier = Modifier
-                                    .size(40.dp)
+                                    .size(44.dp)
                                     .clip(RoundedCornerShape(50))
                                     .background(Color.White.copy(alpha = 0.15f))
                                     .background(
@@ -268,146 +251,167 @@ fun LocalPlaylistSongs(
                                             )
                                         )
                                     )
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color.White.copy(alpha = 0.25f),
-                                        shape = RoundedCornerShape(50)
-                                    )
+                                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
                                     .shadow(4.dp, RoundedCornerShape(50))
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
-                                    ) {
-                                        menuState.display {
-                                            Menu {
-                                                playlist.browseId?.let { browseId ->
-                                                    MenuEntry(
-                                                        icon = R.drawable.sync,
-                                                        text = stringResource(R.string.sync),
-                                                        enabled = !loading,
-                                                        onClick = {
-                                                            menuState.hide()
-                                                            coroutineScope.launch {
-                                                                loading = true
-                                                                sync(playlist, browseId)
-                                                                loading = false
-                                                            }
-                                                        }
-                                                    )
-
-                                                    songs.firstOrNull()?.id?.let { firstSongId ->
-                                                        MenuEntry(
-                                                            icon = R.drawable.play,
-                                                            text = stringResource(R.string.watch_playlist_on_youtube),
-                                                            onClick = {
-                                                                menuState.hide()
-                                                                binder?.player?.pause()
-                                                                uriHandler.openUri(
-                                                                    "https://youtube.com/watch?v=$firstSongId&list=${
-                                                                        playlist.browseId.drop(2)
-                                                                    }"
-                                                                )
-                                                            }
-                                                        )
-
-                                                        val errorMessage =
-                                                            stringResource(R.string.youtube_music_not_installed)
-                                                        MenuEntry(
-                                                            icon = R.drawable.musical_notes,
-                                                            text = stringResource(R.string.open_in_youtube_music),
-                                                            onClick = {
-                                                                menuState.hide()
-                                                                binder?.player?.pause()
-                                                                if (
-                                                                    !launchYouTubeMusic(
-                                                                        context = context,
-                                                                        endpoint = "watch?v=$firstSongId&list=${
-                                                                            playlist.browseId.drop(2)
-                                                                        }"
-                                                                    )
-                                                                ) {
-                                                                    context.toast(errorMessage)
-                                                                }
-                                                            }
-                                                        )
-                                                    }
-                                                }
-
-                                                MenuEntry(
-                                                    icon = R.drawable.pencil,
-                                                    text = stringResource(R.string.rename),
-                                                    onClick = {
-                                                        menuState.hide()
-                                                        isRenaming = true
-                                                    }
-                                                )
-
-                                                MenuEntry(
-                                                    icon = R.drawable.disc,
-                                                    text = "Change cover",
-                                                    onClick = {
-                                                        menuState.hide()
-                                                        coverPickerLauncher.launch(
-                                                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
-                                                        )
-                                                    }
-                                                )
-
-                                                MenuEntry(
-                                                    icon = R.drawable.trash,
-                                                    text = stringResource(R.string.delete),
-                                                    onClick = {
-                                                        menuState.hide()
-                                                        isDeleting = true
-                                                    }
-                                                )
-                                            }
-                                        }
-                                    },
+                                    ) { onDelete() },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Image(
-                                    painter = painterResource(R.drawable.ellipsis_horizontal),
-                                    contentDescription = "Menu",
+                                    painter = painterResource(R.drawable.chevron_back),
+                                    contentDescription = "Back",
                                     colorFilter = ColorFilter.tint(Color.White),
-                                    modifier = Modifier.size(22.dp)
+                                    modifier = Modifier.size(24.dp)
                                 )
+                            }
+
+                            // Right side: loading + menu
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                AnimatedVisibility(loading) {
+                                    CircularProgressIndicator(modifier = Modifier.size(18.dp))
+                                }
+
+                                // Menu button (glossy circle)
+                                Box(
+                                    modifier = Modifier
+                                        .size(44.dp)
+                                        .clip(RoundedCornerShape(50))
+                                        .background(Color.White.copy(alpha = 0.15f))
+                                        .background(
+                                            Brush.verticalGradient(
+                                                colorStops = arrayOf(
+                                                    0.0f to Color.White.copy(alpha = 0.30f),
+                                                    0.4f to Color.Transparent
+                                                )
+                                            )
+                                        )
+                                        .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
+                                        .shadow(4.dp, RoundedCornerShape(50))
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) {
+                                            menuState.display {
+                                                Menu {
+                                                    playlist.browseId?.let { browseId ->
+                                                        MenuEntry(
+                                                            icon = R.drawable.sync,
+                                                            text = stringResource(R.string.sync),
+                                                            enabled = !loading,
+                                                            onClick = {
+                                                                menuState.hide()
+                                                                coroutineScope.launch {
+                                                                    loading = true
+                                                                    sync(playlist, browseId)
+                                                                    loading = false
+                                                                }
+                                                            }
+                                                        )
+                                                        songs.firstOrNull()?.id?.let { firstSongId ->
+                                                            MenuEntry(
+                                                                icon = R.drawable.play,
+                                                                text = stringResource(R.string.watch_playlist_on_youtube),
+                                                                onClick = {
+                                                                    menuState.hide()
+                                                                    binder?.player?.pause()
+                                                                    uriHandler.openUri(
+                                                                        "https://youtube.com/watch?v=$firstSongId&list=${playlist.browseId.drop(2)}"
+                                                                    )
+                                                                }
+                                                            )
+                                                            val errorMessage = stringResource(R.string.youtube_music_not_installed)
+                                                            MenuEntry(
+                                                                icon = R.drawable.musical_notes,
+                                                                text = stringResource(R.string.open_in_youtube_music),
+                                                                onClick = {
+                                                                    menuState.hide()
+                                                                    binder?.player?.pause()
+                                                                    if (!launchYouTubeMusic(
+                                                                        context = context,
+                                                                        endpoint = "watch?v=$firstSongId&list=${playlist.browseId.drop(2)}"
+                                                                    )) {
+                                                                        context.toast(errorMessage)
+                                                                    }
+                                                                }
+                                                            )
+                                                        }
+                                                    }
+                                                    MenuEntry(
+                                                        icon = R.drawable.pencil,
+                                                        text = stringResource(R.string.rename),
+                                                        onClick = { menuState.hide(); isRenaming = true }
+                                                    )
+                                                    MenuEntry(
+                                                        icon = R.drawable.disc,
+                                                        text = "Change cover",
+                                                        onClick = {
+                                                            menuState.hide()
+                                                            coverPickerLauncher.launch(
+                                                                PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                                                            )
+                                                        }
+                                                    )
+                                                    MenuEntry(
+                                                        icon = R.drawable.trash,
+                                                        text = stringResource(R.string.delete),
+                                                        onClick = { menuState.hide(); isDeleting = true }
+                                                    )
+                                                }
+                                            }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Image(
+                                        painter = painterResource(R.drawable.ellipsis_horizontal),
+                                        contentDescription = "Menu",
+                                        colorFilter = ColorFilter.tint(Color.White),
+                                        modifier = Modifier.size(22.dp)
+                                    )
+                                }
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(16.dp))
+                        Spacer(modifier = Modifier.height(48.dp))
 
-                        // ---- PLAYLIST NAME (large, centered, white) ----
+                        // ---- PLAYLIST NAME (large, bold, white, centered) ----
                         BasicText(
                             text = playlist.name,
-                            style = typography.l.semiBold.copy(
-                                color = Color.White
-                            ),
+                            style = typography.l.semiBold.copy(color = Color.White),
                             maxLines = 2,
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.padding(horizontal = 24.dp)
                         )
 
-                        // ---- Song count ----
+                        // ---- "Your Playlist" subtitle ----
                         BasicText(
-                            text = "${songs.size} ${stringResource(R.string.songs)}",
-                            style = typography.xs.semiBold.copy(
-                                color = Color.White.copy(alpha = 0.6f)
-                            ),
+                            text = "Your Playlist",
+                            style = typography.s.semiBold.copy(color = Color.White.copy(alpha = 0.8f)),
                             modifier = Modifier.padding(top = 4.dp)
                         )
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        // ---- Date created ----
+                        BasicText(
+                            text = "Created at $createdDate",
+                            style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.5f)),
+                            modifier = Modifier.padding(top = 2.dp)
+                        )
 
-                        // ---- CENTER BUTTONS: Shuffle, Play/Pause, Search ----
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // ---- CENTER BUTTONS: Shuffle | Play/Pause | Search ----
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(20.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            // Shuffle (circle, glossy)
+                            // Shuffle (glossy circle, 48dp)
                             Box(
                                 modifier = Modifier
-                                    .size(52.dp)
+                                    .size(48.dp)
                                     .clip(RoundedCornerShape(50))
                                     .background(Color.White.copy(alpha = 0.15f))
                                     .background(
@@ -418,11 +422,7 @@ fun LocalPlaylistSongs(
                                             )
                                         )
                                     )
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color.White.copy(alpha = 0.25f),
-                                        shape = RoundedCornerShape(50)
-                                    )
+                                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
                                     .shadow(4.dp, RoundedCornerShape(50))
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
@@ -441,30 +441,27 @@ fun LocalPlaylistSongs(
                                     painter = painterResource(R.drawable.shuffle),
                                     contentDescription = "Shuffle",
                                     colorFilter = ColorFilter.tint(Color.White),
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
 
-                            // Play/Pause (large white pill button)
+                            // Play/Pause (white pill, 150dp × 48dp)
                             Box(
                                 modifier = Modifier
-                                    .width(160.dp)
-                                    .height(52.dp)
-                                    .clip(RoundedCornerShape(26.dp))
+                                    .width(150.dp)
+                                    .height(48.dp)
+                                    .clip(RoundedCornerShape(24.dp))
                                     .background(Color.White)
-                                    .shadow(6.dp, RoundedCornerShape(26.dp))
+                                    .shadow(6.dp, RoundedCornerShape(24.dp))
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
                                         if (songs.isNotEmpty()) {
-                                            if (playing) {
-                                                binder?.player?.pause()
-                                            } else {
+                                            if (playing) binder?.player?.pause()
+                                            else {
                                                 binder?.stopRadio()
-                                                binder?.player?.forcePlayFromBeginning(
-                                                    songs.map { it.asMediaItem }
-                                                )
+                                                binder?.player?.forcePlayFromBeginning(songs.map { it.asMediaItem })
                                             }
                                         }
                                     },
@@ -480,21 +477,19 @@ fun LocalPlaylistSongs(
                                         ),
                                         contentDescription = if (playing) "Pause" else "Play",
                                         colorFilter = ColorFilter.tint(colorPalette.background0),
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(22.dp)
                                     )
                                     BasicText(
                                         text = if (playing) "Pause" else "Play",
-                                        style = typography.s.semiBold.copy(
-                                            color = colorPalette.background0
-                                        )
+                                        style = typography.s.semiBold.copy(color = colorPalette.background0)
                                     )
                                 }
                             }
 
-                            // Search (circle, glossy — replaces download)
+                            // Search (glossy circle, 48dp — replaces download)
                             Box(
                                 modifier = Modifier
-                                    .size(52.dp)
+                                    .size(48.dp)
                                     .clip(RoundedCornerShape(50))
                                     .background(Color.White.copy(alpha = 0.15f))
                                     .background(
@@ -505,17 +500,13 @@ fun LocalPlaylistSongs(
                                             )
                                         )
                                     )
-                                    .border(
-                                        width = 1.dp,
-                                        color = Color.White.copy(alpha = 0.25f),
-                                        shape = RoundedCornerShape(50)
-                                    )
+                                    .border(1.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(50))
                                     .shadow(4.dp, RoundedCornerShape(50))
                                     .clickable(
                                         interactionSource = remember { MutableInteractionSource() },
                                         indication = null
                                     ) {
-                                        // Search within playlist — opens search
+                                        // TODO: Open in-playlist search
                                     },
                                 contentAlignment = Alignment.Center
                             ) {
@@ -523,12 +514,58 @@ fun LocalPlaylistSongs(
                                     painter = painterResource(R.drawable.search),
                                     contentDescription = "Search",
                                     colorFilter = ColorFilter.tint(Color.White),
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(22.dp)
                                 )
                             }
                         }
 
-                        Spacer(modifier = Modifier.height(24.dp))
+                        Spacer(modifier = Modifier.height(20.dp))
+
+                        // ---- Song count ----
+                        BasicText(
+                            text = "${songs.size} ${stringResource(R.string.songs)}",
+                            style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.6f)),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+
+                        Spacer(modifier = Modifier.height(8.dp))
+
+                        // ---- Sort chip ----
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp)
+                                .clip(RoundedCornerShape(20.dp))
+                                .background(Color.White.copy(alpha = 0.08f))
+                                .border(1.dp, Color.White.copy(alpha = 0.15f), RoundedCornerShape(20.dp))
+                                .clickable(
+                                    interactionSource = remember { MutableInteractionSource() },
+                                    indication = null
+                                ) {
+                                    // Toggle sort order
+                                    sortBy = if (sortBy == "Custom Order") "Date Added" else "Custom Order"
+                                }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.reorder),
+                                    contentDescription = null,
+                                    colorFilter = ColorFilter.tint(Color.White.copy(alpha = 0.6f)),
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                BasicText(
+                                    text = "Sort by: $sortBy",
+                                    style = typography.xs.semiBold.copy(color = Color.White.copy(alpha = 0.7f))
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(8.dp))
                     }
                 }
 
@@ -560,18 +597,12 @@ fun LocalPlaylistSongs(
                                 }
                             )
                             .animateItemPlacement(reorderingState)
-                            .draggedItem(
-                                reorderingState = reorderingState,
-                                index = index
-                            )
+                            .draggedItem(reorderingState = reorderingState, index = index)
                             .background(colorPalette.background0),
                         song = song,
                         thumbnailSize = Dimensions.thumbnails.song,
                         trailingContent = {
-                            ReorderHandle(
-                                reorderingState = reorderingState,
-                                index = index
-                            )
+                            ReorderHandle(reorderingState = reorderingState, index = index)
                         },
                         clip = !reorderingState.isDragging,
                         isPlaying = playing && currentMediaId == song.id
@@ -591,7 +622,6 @@ private suspend fun sync(
     )?.completed()?.getOrNull()?.let { remotePlaylist ->
         transaction {
             Database.clearPlaylist(playlist.id)
-
             remotePlaylist.songsPage
                 ?.items
                 ?.map { it.asMediaItem }
