@@ -246,6 +246,8 @@ fun PlaylistItem(
         ) {
             // ---- PLAYLIST COVER (the white "P.C" block in your drawing) ----
             // Sits on top of the glass, with its own shadow for depth.
+            // NO background color — transparent so the glass shows through
+            // while the image loads (no rectangle shape visible).
             Box(
                 modifier = Modifier
                     .then(
@@ -253,7 +255,6 @@ fun PlaylistItem(
                         else Modifier.requiredSize(thumbnailSize)
                     )
                     .clip(RoundedCornerShape(14.dp))
-                    .background(color = colorPalette.background1)
                     .shadow(
                         elevation = 8.dp,
                         shape = RoundedCornerShape(14.dp),
