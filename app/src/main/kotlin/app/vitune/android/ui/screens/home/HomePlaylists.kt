@@ -136,7 +136,7 @@ fun HomePlaylists(
     LaunchedEffect(playlistSortBy, playlistSortOrder) {
         Database
             .playlistPreviews(playlistSortBy, playlistSortOrder)
-            .collect { items = it.toImmutableList() }
+            .collect { allItems = it.toImmutableList() }
     }
 
     LaunchedEffect(Unit) {
