@@ -91,6 +91,7 @@ import app.vitune.providers.piped.models.Session
 import coil3.compose.AsyncImage
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.async
+import app.vitune.providers.piped.models.PlaylistPreview as PipedPlaylistPreview
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Route
@@ -98,7 +99,7 @@ import kotlinx.coroutines.async
 fun HomePlaylists(
     onBuiltInPlaylist: (BuiltInPlaylist) -> Unit,
     onPlaylistClick: (Playlist) -> Unit,
-    onPipedPlaylistClick: (Session, app.vitune.providers.piped.models.PlaylistPreview) -> Unit,
+    onPipedPlaylistClick: (Session, PipedPlaylistPreview) -> Unit,
     onSearchClick: () -> Unit
 ) = with(OrderPreferences) {
     val (colorPalette) = LocalAppearance.current
@@ -108,6 +109,7 @@ fun HomePlaylists(
 
     if (isCreatingANewPlaylist) TextFieldDialog(
         hintText = stringResource(R.string.enter_playlist_name_prompt),
+        onDismiss = { isCreatingANewPlaylist = false },
         onAccept = { text ->
             query {
                 Database.insert(Playlist(name = text))
@@ -116,7 +118,7 @@ fun HomePlaylists(
     )
 
     var items by persistList<PlaylistPreview>("home/playlists")
-    var pipedSessions by persist<Map<PipedSession, List<app.vitune.providers.piped.models.PlaylistPreview>?>>("home/piped")
+    var pipedSessions by persist<Map<PipedSession, List<PipedPlaylistPreview>?>>("home/piped")
 
     LaunchedEffect(playlistSortBy, playlistSortOrder) {
         Database
@@ -171,7 +173,7 @@ fun HomePlaylists(
                     Spacer(modifier = Modifier.weight(1f))
 
                     HeaderIconButton(
-                        icon = R.drawable.grid_view,
+                        icon = if (UIStatePreferences.playlistsAsGrid) R.drawable.grid else R.drawable.list,
                         enabled = UIStatePreferences.playlistsAsGrid,
                         onClick = { UIStatePreferences.playlistsAsGrid = !UIStatePreferences.playlistsAsGrid }
                     )
@@ -179,7 +181,7 @@ fun HomePlaylists(
                     VerticalDivider()
 
                     HeaderIconButton(
-                        icon = R.drawable.sort,
+                        icon = R.drawable.medical,
                         rotation = sortOrderIconRotation,
                         onClick = {
                             playlistSortOrder = if (playlistSortOrder == SortOrder.Ascending)
@@ -290,12 +292,18 @@ fun HomePlaylists(
                             key = { "piped-${session.username}-${it.id}" }
                         ) { playlist ->
                             PlaylistItem(
-                                playlist = playlist,
+                                name = playlist.name,
+                                songCount = playlist.videoCount,
+                                channelName = null,
+                                thumbnailUrl = playlist.thumbnailUrl.toString(),
                                 thumbnailSize = Dimensions.thumbnails.playlist,
                                 alternative = UIStatePreferences.playlistsAsGrid,
                                 modifier = Modifier
                                     .clickable(onClick = {
-                                        onPipedPlaylistClick(session, playlist)
+                                        onPipedPlaylistClick(
+                                            session.toApiSession(),
+                                            playlist
+                                        )
                                     })
                                     .animateItem(fadeInSpec = null, fadeOutSpec = null)
                             )
