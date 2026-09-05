@@ -46,6 +46,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -194,19 +195,27 @@ fun LocalPlaylistSongs(
     //  - Sort works + song count inside capsule
     //  - Search filters songs in playlist
     // ====================================================================
+    // Determine the background image URL for the blurred background.
+    // If playlist has a custom cover: use it.
+    // If no cover: use the first song's thumbnail.
+    val backgroundUrl = thumbnailUrl ?: songs.firstOrNull()?.thumbnailUrl
+
     Box(modifier = modifier.fillMaxSize()) {
-        // ---- 1. FULL-SCREEN ALBUM ART WITH BLUR ----
-        // The blur is ON the AsyncImage itself (not a separate empty Box).
-        // 20dp blur = ~60% blur (art shapes visible, details gone).
-        // This is the key fix — before, blur was on an empty Box which did nothing.
-        AsyncImage(
-            model = thumbnailUrl,
-            contentDescription = null,
-            contentScale = ContentScale.Crop,
-            modifier = Modifier
-                .fillMaxSize()
-                .blur(20.dp)
-        )
+        // ---- 1. FULL-SCREEN BACKGROUND WITH BLUR (60%) ----
+        // Uses custom cover OR first song's thumbnail as background.
+        if (backgroundUrl != null) {
+            AsyncImage(
+                model = backgroundUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(20.dp)
+            )
+        } else {
+            // No cover and no songs — solid dark background
+            Box(modifier = Modifier.fillMaxSize().background(colorPalette.background0))
+        }
 
         // ---- 2. DARK GRADIENT (melts into pitch black #000) ----
         // Transparent at top (art visible) → semi-dark middle → pure #000 bottom
@@ -384,10 +393,71 @@ fun LocalPlaylistSongs(
                             )
                         }
 
-                        // ---- LARGE SPACER (pushes content to CENTER of screen) ----
-                        // This pushes the playlist name + buttons to the vertical center,
-                        // matching the SimpMusic reference where play button is at ~50%.
-                        Spacer(modifier = Modifier.height(200.dp))
+                        // ---- CRISP COVER PHOTO (on top of blurred background) ----
+                        // If playlist has a custom cover: show it.
+                        // If no custom cover: use song thumbnails as collage.
+                        // - 1 song: single thumbnail
+                        // - 2-3 songs: first 2 thumbnails side by side
+                        // - 4+ songs: 2x2 collage of first 4 thumbnails
+                        Box(
+                            modifier = Modifier
+                                .padding(vertical = 8.dp)
+                                .size(240.dp)
+                                .shadow(
+                                    elevation = 6.dp,
+                                    shape = RoundedCornerShape(12.dp),
+                                    clip = false,
+                                    ambientColor = Color.Black,
+                                    spotColor = Color.Black
+                                )
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(colorPalette.background1)
+                        ) {
+                            if (thumbnailUrl != null) {
+                                // Custom cover photo
+                                AsyncImage(
+                                    model = thumbnailUrl,
+                                    contentDescription = "Playlist cover",
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            } else if (songs.isNotEmpty()) {
+                                // Auto-generated cover from song thumbnails
+                                val collageThumbs = songs.take(4).map { it.thumbnailUrl }
+                                if (collageThumbs.size == 1) {
+                                    // Single song — full thumbnail
+                                    AsyncImage(
+                                        model = collageThumbs[0],
+                                        contentDescription = "Playlist cover",
+                                        contentScale = ContentScale.Crop,
+                                        modifier = Modifier.fillMaxSize()
+                                    )
+                                } else {
+                                    // Multiple songs — 2x2 grid collage
+                                    Box(modifier = Modifier.fillMaxSize()) {
+                                        listOf(
+                                            Alignment.TopStart,
+                                            Alignment.TopEnd,
+                                            Alignment.BottomStart,
+                                            Alignment.BottomEnd
+                                        ).forEachIndexed { index, alignment ->
+                                            if (index < collageThumbs.size) {
+                                                AsyncImage(
+                                                    model = collageThumbs[index],
+                                                    contentDescription = null,
+                                                    contentScale = ContentScale.Crop,
+                                                    modifier = Modifier
+                                                        .align(alignment)
+                                                        .fillMaxSize(0.5f)
+                                                )
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         // ---- PLAYLIST NAME ----
                         BasicText(
