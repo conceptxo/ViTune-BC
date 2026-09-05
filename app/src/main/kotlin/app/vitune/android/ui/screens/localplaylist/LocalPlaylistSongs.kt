@@ -124,6 +124,7 @@ fun LocalPlaylistSongs(
     var isSortedOldestFirst by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearching by rememberSaveable { mutableStateOf(false) }
+    var isLocked by rememberSaveable { mutableStateOf(true) }
 
     // Filter + sort songs
     val displaySongs = remember(songs, isSortedOldestFirst, searchQuery, isSearching) {
