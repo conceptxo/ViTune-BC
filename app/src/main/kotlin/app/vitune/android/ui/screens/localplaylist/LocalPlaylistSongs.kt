@@ -181,6 +181,10 @@ fun LocalPlaylistSongs(
     )
 
     val (currentMediaId, playing) = playingSong(binder)
+    // Only show "Pause" if the currently playing song is FROM this playlist.
+    // If no song is playing, or a song from another playlist is playing, show "Play".
+    val isPlayingThisPlaylist = playing && currentMediaId != null &&
+        songs.any { it.id == currentMediaId }
     val dateFormat = remember { SimpleDateFormat("HH:mm – dd MMMM yyyy", Locale.getDefault()) }
     val createdDate = remember(playlist.id) { dateFormat.format(Date()) }
 
@@ -525,7 +529,7 @@ fun LocalPlaylistSongs(
                                         indication = null
                                     ) {
                                         if (displaySongs.isNotEmpty()) {
-                                            if (playing) binder?.player?.pause()
+                                            if (isPlayingThisPlaylist) binder?.player?.pause()
                                             else {
                                                 binder?.stopRadio()
                                                 binder?.player?.forcePlayFromBeginning(
@@ -541,13 +545,13 @@ fun LocalPlaylistSongs(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Image(
-                                        painter = painterResource(if (playing) R.drawable.pause else R.drawable.play),
-                                        contentDescription = if (playing) "Pause" else "Play",
+                                        painter = painterResource(if (isPlayingThisPlaylist) R.drawable.pause else R.drawable.play),
+                                        contentDescription = if (isPlayingThisPlaylist) "Pause" else "Play",
                                         colorFilter = ColorFilter.tint(colorPalette.background0),
                                         modifier = Modifier.size(22.dp)
                                     )
                                     BasicText(
-                                        text = if (playing) "Pause" else "Play",
+                                        text = if (isPlayingThisPlaylist) "Pause" else "Play",
                                         style = typography.s.semiBold.copy(color = colorPalette.background0)
                                     )
                                 }
