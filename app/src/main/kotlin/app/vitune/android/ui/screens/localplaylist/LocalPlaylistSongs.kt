@@ -46,7 +46,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -125,7 +124,6 @@ fun LocalPlaylistSongs(
     var isSortedOldestFirst by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearching by rememberSaveable { mutableStateOf(false) }
-    var isLocked by rememberSaveable { mutableStateOf(true) }
 
     // Filter + sort songs
     val displaySongs = remember(songs, isSortedOldestFirst, searchQuery, isSearching) {
@@ -196,15 +194,17 @@ fun LocalPlaylistSongs(
     //  - Search filters songs in playlist
     // ====================================================================
     Box(modifier = modifier.fillMaxSize()) {
-        // ---- 1. FULL-SCREEN ALBUM ART WITH BLUR (45-50%) ----
-        // 15dp blur = ~45-50% blur (shapes visible, details gone).
+        // ---- 1. FULL-SCREEN ALBUM ART WITH BLUR ----
+        // The blur is ON the AsyncImage itself (not a separate empty Box).
+        // 20dp blur = ~60% blur (art shapes visible, details gone).
+        // This is the key fix — before, blur was on an empty Box which did nothing.
         AsyncImage(
             model = thumbnailUrl,
             contentDescription = null,
             contentScale = ContentScale.Crop,
             modifier = Modifier
                 .fillMaxSize()
-                .blur(15.dp)
+                .blur(20.dp)
         )
 
         // ---- 2. DARK GRADIENT (melts into pitch black #000) ----
@@ -272,20 +272,20 @@ fun LocalPlaylistSongs(
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
                                 }
 
-                                // Lock icon — toggles reorder handle visibility
-                                // When locked: reorder handles hidden. When unlocked: visible.
+                                // Search — plain icon (WORKS — toggles search mode)
                                 Image(
-                                    painter = painterResource(
-                                        if (isLocked) R.drawable.lock else R.drawable.lock_open
-                                    ),
-                                    contentDescription = if (isLocked) "Unlock reordering" else "Lock reordering",
+                                    painter = painterResource(R.drawable.search),
+                                    contentDescription = "Search",
                                     colorFilter = ColorFilter.tint(Color.White),
                                     modifier = Modifier
                                         .size(28.dp)
                                         .clickable(
                                             interactionSource = remember { MutableInteractionSource() },
                                             indication = null
-                                        ) { isLocked = !isLocked }
+                                        ) {
+                                            isSearching = !isSearching
+                                            if (!isSearching) searchQuery = ""
+                                        }
                                 )
 
                                 // Menu — plain icon
@@ -392,15 +392,20 @@ fun LocalPlaylistSongs(
                         }
 
                         // ---- CRISP COVER PHOTO (on top of blurred background) ----
-                        // This is the ACTUAL playlist cover, NOT blurred.
-                        // Sits at the top center, with 12dp rounded corners + shadow.
-                        // The blurred background is visible around it.
+                        // Bigger size (240dp), 12dp rounded corners, tiny black blur shadow.
+                        // The shadow is small (6dp) + high blur radius for a soft "glow" behind.
                         Box(
                             modifier = Modifier
-                                .padding(horizontal = 16.dp, vertical = 8.dp)
-                                .size(width = 200.dp, height = 200.dp)
+                                .padding(vertical = 8.dp)
+                                .size(240.dp)
+                                .shadow(
+                                    elevation = 6.dp,
+                                    shape = RoundedCornerShape(12.dp),
+                                    clip = false,
+                                    ambientColor = Color.Black,
+                                    spotColor = Color.Black
+                                )
                                 .clip(RoundedCornerShape(12.dp))
-                                .shadow(16.dp, RoundedCornerShape(12.dp))
                         ) {
                             AsyncImage(
                                 model = thumbnailUrl,
@@ -614,10 +619,7 @@ fun LocalPlaylistSongs(
                         song = song,
                         thumbnailSize = Dimensions.thumbnails.song,
                         trailingContent = {
-                            // Reorder handle only visible when unlocked
-                            if (!isLocked) {
-                                ReorderHandle(reorderingState = reorderingState, index = index)
-                            }
+                            ReorderHandle(reorderingState = reorderingState, index = index)
                         },
                         clip = !reorderingState.isDragging,
                         isPlaying = playing && currentMediaId == song.id
