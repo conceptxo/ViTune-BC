@@ -125,6 +125,7 @@ fun LocalPlaylistSongs(
     var isSortedOldestFirst by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearching by rememberSaveable { mutableStateOf(false) }
+    var isLocked by rememberSaveable { mutableStateOf(true) }
 
     // Filter + sort songs
     val displaySongs = remember(songs, isSortedOldestFirst, searchQuery, isSearching) {
@@ -273,10 +274,10 @@ fun LocalPlaylistSongs(
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
                                 }
 
-                                // Search — plain icon (WORKS — toggles search mode)
+                                // Plus icon — add new songs to playlist
                                 Image(
-                                    painter = painterResource(R.drawable.search),
-                                    contentDescription = "Search",
+                                    painter = painterResource(R.drawable.plus_circle),
+                                    contentDescription = "Add songs",
                                     colorFilter = ColorFilter.tint(Color.White),
                                     modifier = Modifier
                                         .size(28.dp)
@@ -284,9 +285,23 @@ fun LocalPlaylistSongs(
                                             interactionSource = remember { MutableInteractionSource() },
                                             indication = null
                                         ) {
-                                            isSearching = !isSearching
-                                            if (!isSearching) searchQuery = ""
+                                            // TODO: Open song picker to add songs
                                         }
+                                )
+
+                                // Lock icon — toggles reorder handle visibility
+                                Image(
+                                    painter = painterResource(
+                                        if (isLocked) R.drawable.lock else R.drawable.lock_open
+                                    ),
+                                    contentDescription = if (isLocked) "Unlock reordering" else "Lock reordering",
+                                    colorFilter = ColorFilter.tint(Color.White),
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) { isLocked = !isLocked }
                                 )
 
                                 // Menu — plain icon
@@ -620,7 +635,9 @@ fun LocalPlaylistSongs(
                         song = song,
                         thumbnailSize = Dimensions.thumbnails.song,
                         trailingContent = {
-                            ReorderHandle(reorderingState = reorderingState, index = index)
+                            if (!isLocked) {
+                                ReorderHandle(reorderingState = reorderingState, index = index)
+                            }
                         },
                         clip = !reorderingState.isDragging,
                         isPlaying = playing && currentMediaId == song.id
