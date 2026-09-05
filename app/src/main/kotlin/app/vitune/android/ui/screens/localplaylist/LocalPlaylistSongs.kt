@@ -125,7 +125,7 @@ fun LocalPlaylistSongs(
     var isSortedOldestFirst by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearching by rememberSaveable { mutableStateOf(false) }
-    var isLocked by rememberSaveable { mutableStateOf(true) }
+    var isLocked by rememberSaveable { mutableStateOf(true) }  // When true, reorder handles hidden
 
     // Filter + sort songs
     val displaySongs = remember(songs, isSortedOldestFirst, searchQuery, isSearching) {
@@ -274,15 +274,15 @@ fun LocalPlaylistSongs(
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
                                 }
 
-                                // Lock icon — toggles reorder handle visibility
+                                // Reorder toggle icon — shows/hides the drag handles on songs
                                 Image(
-                                    painter = painterResource(
-                                        if (isLocked) R.drawable.lock else R.drawable.lock_open
+                                    painter = painterResource(R.drawable.arrow_down_up),
+                                    contentDescription = if (isLocked) "Show reorder handles" else "Hide reorder handles",
+                                    colorFilter = ColorFilter.tint(
+                                        if (isLocked) Color.White.copy(alpha = 0.5f) else Color.White
                                     ),
-                                    contentDescription = if (isLocked) "Unlock reordering" else "Lock reordering",
-                                    colorFilter = ColorFilter.tint(Color.White),
                                     modifier = Modifier
-                                        .size(28.dp)
+                                        .size(26.dp)
                                         .clickable(
                                             interactionSource = remember { MutableInteractionSource() },
                                             indication = null
