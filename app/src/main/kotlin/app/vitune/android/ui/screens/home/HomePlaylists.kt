@@ -51,6 +51,7 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -182,11 +183,9 @@ fun HomePlaylists(
 
                     HeaderIconButton(
                         icon = R.drawable.medical,
-                        rotation = sortOrderIconRotation,
-                        onClick = {
-                            playlistSortOrder = if (playlistSortOrder == SortOrder.Ascending)
-                                SortOrder.Descending else SortOrder.Ascending
-                        }
+                        color = colorPalette.text,
+                        onClick = { playlistSortOrder = !playlistSortOrder },
+                        modifier = Modifier.graphicsLayer { rotationZ = sortOrderIconRotation }
                     )
                 }
             }
