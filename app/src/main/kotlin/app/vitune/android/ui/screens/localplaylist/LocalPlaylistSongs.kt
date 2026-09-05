@@ -46,7 +46,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
@@ -125,7 +124,6 @@ fun LocalPlaylistSongs(
     var isSortedOldestFirst by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearching by rememberSaveable { mutableStateOf(false) }
-    var isLocked by rememberSaveable { mutableStateOf(true) }  // When true, reorder handles hidden
 
     // Filter + sort songs
     val displaySongs = remember(songs, isSortedOldestFirst, searchQuery, isSearching) {
@@ -274,22 +272,7 @@ fun LocalPlaylistSongs(
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
                                 }
 
-                                // Reorder toggle icon — shows/hides the drag handles on songs
-                                Image(
-                                    painter = painterResource(R.drawable.arrow_down_up),
-                                    contentDescription = if (isLocked) "Show reorder handles" else "Hide reorder handles",
-                                    colorFilter = ColorFilter.tint(
-                                        if (isLocked) Color.White.copy(alpha = 0.5f) else Color.White
-                                    ),
-                                    modifier = Modifier
-                                        .size(26.dp)
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null
-                                        ) { isLocked = !isLocked }
-                                )
-
-                                // Menu — plain icon
+                                // Menu — plain icon (ONLY this, no reorder icon in top bar)
                                 Image(
                                     painter = painterResource(R.drawable.ellipsis_horizontal),
                                     contentDescription = "Menu",
@@ -344,6 +327,14 @@ fun LocalPlaylistSongs(
                                                         }
                                                     }
                                                     MenuEntry(
+                                                        icon = R.drawable.arrow_down_up,
+                                                        text = if (isLocked) "Reorder songs" else "Done reordering",
+                                                        onClick = {
+                                                            menuState.hide()
+                                                            isLocked = !isLocked
+                                                        }
+                                                    )
+                                                    MenuEntry(
                                                         icon = R.drawable.pencil,
                                                         text = stringResource(R.string.rename),
                                                         onClick = { menuState.hide(); isRenaming = true }
@@ -392,31 +383,10 @@ fun LocalPlaylistSongs(
                             )
                         }
 
-                        // ---- CRISP COVER PHOTO (on top of blurred background) ----
-                        // Bigger size (240dp), 12dp rounded corners, tiny black blur shadow.
-                        // The shadow is small (6dp) + high blur radius for a soft "glow" behind.
-                        Box(
-                            modifier = Modifier
-                                .padding(vertical = 8.dp)
-                                .size(240.dp)
-                                .shadow(
-                                    elevation = 6.dp,
-                                    shape = RoundedCornerShape(12.dp),
-                                    clip = false,
-                                    ambientColor = Color.Black,
-                                    spotColor = Color.Black
-                                )
-                                .clip(RoundedCornerShape(12.dp))
-                        ) {
-                            AsyncImage(
-                                model = thumbnailUrl,
-                                contentDescription = "Playlist cover",
-                                contentScale = ContentScale.Crop,
-                                modifier = Modifier.fillMaxSize()
-                            )
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
+                        // ---- LARGE SPACER (pushes content to CENTER of screen) ----
+                        // This pushes the playlist name + buttons to the vertical center,
+                        // matching the SimpMusic reference where play button is at ~50%.
+                        Spacer(modifier = Modifier.height(200.dp))
 
                         // ---- PLAYLIST NAME ----
                         BasicText(
