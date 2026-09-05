@@ -68,9 +68,12 @@ import app.vitune.android.preferences.DataPreferences
 import app.vitune.android.preferences.OrderPreferences
 import app.vitune.android.preferences.UIStatePreferences
 import app.vitune.android.query
+import app.vitune.android.ui.components.LocalMenuState
 import app.vitune.android.ui.components.themed.FloatingActionsContainerWithScrollToTop
 import app.vitune.android.ui.components.themed.Header
 import app.vitune.android.ui.components.themed.HeaderIconButton
+import app.vitune.android.ui.components.themed.Menu
+import app.vitune.android.ui.components.themed.MenuEntry
 import app.vitune.android.ui.components.themed.SecondaryTextButton
 import app.vitune.android.ui.components.themed.TextFieldDialog
 import app.vitune.android.ui.components.themed.VerticalDivider
@@ -107,6 +110,10 @@ fun HomePlaylists(
     val context = LocalContext.current
 
     var isCreatingANewPlaylist by rememberSaveable { mutableStateOf(false) }
+    var searchQuery by rememberSaveable { mutableStateOf("") }
+    var isSearching by rememberSaveable { mutableStateOf(false) }
+    var isReorderMode by rememberSaveable { mutableStateOf(false) }
+    val menuState = LocalMenuState.current
 
     if (isCreatingANewPlaylist) TextFieldDialog(
         hintText = stringResource(R.string.enter_playlist_name_prompt),
@@ -118,7 +125,12 @@ fun HomePlaylists(
         }
     )
 
-    var items by persistList<PlaylistPreview>("home/playlists")
+    var allItems by persistList<PlaylistPreview>("home/playlists")
+    val items = remember(allItems, searchQuery, isSearching) {
+        if (isSearching && searchQuery.isNotBlank()) {
+            allItems.filter { it.playlist.name.contains(searchQuery, ignoreCase = true) }.toImmutableList()
+        } else allItems
+    }
     var pipedSessions by persist<Map<PipedSession, List<PipedPlaylistPreview>?>>("home/piped")
 
     LaunchedEffect(playlistSortBy, playlistSortOrder) {
@@ -171,20 +183,42 @@ fun HomePlaylists(
                         onClick = { isCreatingANewPlaylist = true }
                     )
 
-                    Spacer(modifier = Modifier.weight(1f))
+                    Spacer(modifier = Modifier.width(8.dp))
 
-                    HeaderIconButton(
-                        icon = if (UIStatePreferences.playlistsAsGrid) R.drawable.grid else R.drawable.list,
-                        enabled = UIStatePreferences.playlistsAsGrid,
-                        onClick = { UIStatePreferences.playlistsAsGrid = !UIStatePreferences.playlistsAsGrid }
+                    // Search Playlist capsule
+                    SecondaryTextButton(
+                        text = "Search",
+                        onClick = { isSearching = !isSearching; if (!isSearching) searchQuery = "" }
                     )
 
-                    VerticalDivider()
+                    Spacer(modifier = Modifier.weight(1f))
 
+                    // Menu button (star icon with rotation animation)
                     HeaderIconButton(
                         icon = R.drawable.medical,
                         color = colorPalette.text,
-                        onClick = { playlistSortOrder = !playlistSortOrder },
+                        onClick = {
+                            menuState.display {
+                                Menu {
+                                    MenuEntry(
+                                        icon = R.drawable.arrow_down_up,
+                                        text = if (isReorderMode) "Done reordering" else "Reorder playlists",
+                                        onClick = {
+                                            menuState.hide()
+                                            isReorderMode = !isReorderMode
+                                        }
+                                    )
+                                    MenuEntry(
+                                        icon = R.drawable.medical,
+                                        text = if (playlistSortOrder == SortOrder.Ascending) "Sort: Newest First" else "Sort: Oldest First",
+                                        onClick = {
+                                            menuState.hide()
+                                            playlistSortOrder = !playlistSortOrder
+                                        }
+                                    )
+                                }
+                            }
+                        },
                         modifier = Modifier.graphicsLayer { rotationZ = sortOrderIconRotation }
                     )
                 }
@@ -258,6 +292,27 @@ fun HomePlaylists(
                 }
             }
 
+            // Search bar (visible when searching)
+            if (isSearching) item(key = "search_bar", span = { GridItemSpan(maxLineSpan) }) {
+                androidx.compose.material3.TextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                        .clip(RoundedCornerShape(24.dp)),
+                    placeholder = { BasicText("Search playlists...", style = LocalAppearance.current.typography.s.semiBold.copy(color = Color.White.copy(alpha = 0.4f))) },
+                    singleLine = true,
+                    colors = androidx.compose.material3.TextFieldDefaults.colors(
+                        focusedContainerColor = Color.White.copy(alpha = 0.12f),
+                        unfocusedContainerColor = Color.White.copy(alpha = 0.08f),
+                        cursorColor = Color.White,
+                        focusedTextColor = Color.White,
+                        unfocusedTextColor = Color.White
+                    )
+                )
+            }
+
             items(
                 items = items,
                 key = { it.playlist.id }
@@ -267,7 +322,15 @@ fun HomePlaylists(
                     thumbnailSize = Dimensions.thumbnails.playlist,
                     alternative = UIStatePreferences.playlistsAsGrid,
                     modifier = Modifier
-                        .clickable(onClick = { onPlaylistClick(playlistPreview.playlist) })
+                        .combinedClickable(
+                            onClick = { onPlaylistClick(playlistPreview.playlist) },
+                            onLongClick = {
+                                if (isReorderMode) {
+                                    // TODO: Implement drag-to-reorder for grid
+                                    // For now, shows a toast indicating reorder mode
+                                }
+                            }
+                        )
                         .animateItem(fadeInSpec = null, fadeOutSpec = null)
                 )
             }
