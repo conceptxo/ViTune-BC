@@ -126,6 +126,7 @@ fun LocalPlaylistSongs(
     var isSortedOldestFirst by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearching by rememberSaveable { mutableStateOf(false) }
+    var isLocked by rememberSaveable { mutableStateOf(true) }
 
     // Filter + sort songs
     val displaySongs = remember(songs, isSortedOldestFirst, searchQuery, isSearching) {
@@ -283,23 +284,7 @@ fun LocalPlaylistSongs(
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
                                 }
 
-                                // Search — plain icon (WORKS — toggles search mode)
-                                Image(
-                                    painter = painterResource(R.drawable.search),
-                                    contentDescription = "Search",
-                                    colorFilter = ColorFilter.tint(Color.White),
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null
-                                        ) {
-                                            isSearching = !isSearching
-                                            if (!isSearching) searchQuery = ""
-                                        }
-                                )
-
-                                // Menu — plain icon
+                                // Menu — plain icon (ONLY this in top bar, no search)
                                 Image(
                                     painter = painterResource(R.drawable.ellipsis_horizontal),
                                     contentDescription = "Menu",
@@ -353,6 +338,14 @@ fun LocalPlaylistSongs(
                                                             )
                                                         }
                                                     }
+                                                    MenuEntry(
+                                                        icon = R.drawable.arrow_down_up,
+                                                        text = if (isLocked) "Reorder songs" else "Done reordering",
+                                                        onClick = {
+                                                            menuState.hide()
+                                                            isLocked = !isLocked
+                                                        }
+                                                    )
                                                     MenuEntry(
                                                         icon = R.drawable.pencil,
                                                         text = stringResource(R.string.rename),
@@ -666,7 +659,9 @@ fun LocalPlaylistSongs(
                         song = song,
                         thumbnailSize = Dimensions.thumbnails.song,
                         trailingContent = {
-                            ReorderHandle(reorderingState = reorderingState, index = index)
+                            if (!isLocked) {
+                                ReorderHandle(reorderingState = reorderingState, index = index)
+                            }
                         },
                         clip = !reorderingState.isDragging,
                         isPlaying = playing && currentMediaId == song.id
