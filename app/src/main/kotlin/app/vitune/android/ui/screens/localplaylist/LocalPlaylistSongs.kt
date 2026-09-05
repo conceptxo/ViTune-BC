@@ -274,21 +274,6 @@ fun LocalPlaylistSongs(
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
                                 }
 
-                                // Plus icon — add new songs to playlist
-                                Image(
-                                    painter = painterResource(R.drawable.plus_circle),
-                                    contentDescription = "Add songs",
-                                    colorFilter = ColorFilter.tint(Color.White),
-                                    modifier = Modifier
-                                        .size(28.dp)
-                                        .clickable(
-                                            interactionSource = remember { MutableInteractionSource() },
-                                            indication = null
-                                        ) {
-                                            // TODO: Open song picker to add songs
-                                        }
-                                )
-
                                 // Lock icon — toggles reorder handle visibility
                                 Image(
                                     painter = painterResource(
