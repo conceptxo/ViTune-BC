@@ -84,6 +84,7 @@ import app.vitune.android.utils.forcePlayAtIndex
 import app.vitune.android.utils.forcePlayFromBeginning
 import app.vitune.android.utils.launchYouTubeMusic
 import app.vitune.android.utils.playingSong
+import app.vitune.android.utils.shouldBePlaying
 import app.vitune.android.utils.semiBold
 import app.vitune.android.utils.toast
 import app.vitune.compose.reordering.animateItemPlacement
@@ -125,7 +126,6 @@ fun LocalPlaylistSongs(
     var isSortedOldestFirst by rememberSaveable { mutableStateOf(false) }
     var searchQuery by rememberSaveable { mutableStateOf("") }
     var isSearching by rememberSaveable { mutableStateOf(false) }
-    var isLocked by rememberSaveable { mutableStateOf(true) }
 
     // Filter + sort songs
     val displaySongs = remember(songs, isSortedOldestFirst, searchQuery, isSearching) {
@@ -181,10 +181,12 @@ fun LocalPlaylistSongs(
     )
 
     val (currentMediaId, playing) = playingSong(binder)
-    // Only show "Pause" if the currently playing song is FROM this playlist.
-    // If no song is playing, or a song from another playlist is playing, show "Play".
-    val isPlayingThisPlaylist = playing && currentMediaId != null &&
-        songs.any { it.id == currentMediaId }
+    // Only show "Pause" if a song from THIS playlist is ACTUALLY playing
+    // (not just loaded/paused). Uses shouldBePlaying for accurate state.
+    val isPlayingThisPlaylist = binder?.player?.let { player ->
+        player.shouldBePlaying && currentMediaId != null &&
+            songs.any { it.id == currentMediaId }
+    } ?: false
     val dateFormat = remember { SimpleDateFormat("HH:mm – dd MMMM yyyy", Locale.getDefault()) }
     val createdDate = remember(playlist.id) { dateFormat.format(Date()) }
 
@@ -199,27 +201,19 @@ fun LocalPlaylistSongs(
     //  - Sort works + song count inside capsule
     //  - Search filters songs in playlist
     // ====================================================================
-    // Determine the background image URL for the blurred background.
-    // If playlist has a custom cover: use it.
-    // If no cover: use the first song's thumbnail.
-    val backgroundUrl = thumbnailUrl ?: songs.firstOrNull()?.thumbnailUrl
-
     Box(modifier = modifier.fillMaxSize()) {
-        // ---- 1. FULL-SCREEN BACKGROUND WITH BLUR (60%) ----
-        // Uses custom cover OR first song's thumbnail as background.
-        if (backgroundUrl != null) {
-            AsyncImage(
-                model = backgroundUrl,
-                contentDescription = null,
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxSize()
-                    .blur(20.dp)
-            )
-        } else {
-            // No cover and no songs — solid dark background
-            Box(modifier = Modifier.fillMaxSize().background(colorPalette.background0))
-        }
+        // ---- 1. FULL-SCREEN ALBUM ART WITH BLUR ----
+        // The blur is ON the AsyncImage itself (not a separate empty Box).
+        // 20dp blur = ~60% blur (art shapes visible, details gone).
+        // This is the key fix — before, blur was on an empty Box which did nothing.
+        AsyncImage(
+            model = thumbnailUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .fillMaxSize()
+                .blur(20.dp)
+        )
 
         // ---- 2. DARK GRADIENT (melts into pitch black #000) ----
         // Transparent at top (art visible) → semi-dark middle → pure #000 bottom
@@ -286,7 +280,23 @@ fun LocalPlaylistSongs(
                                     CircularProgressIndicator(modifier = Modifier.size(18.dp))
                                 }
 
-                                // Menu — plain icon (ONLY this, no reorder icon in top bar)
+                                // Search — plain icon (WORKS — toggles search mode)
+                                Image(
+                                    painter = painterResource(R.drawable.search),
+                                    contentDescription = "Search",
+                                    colorFilter = ColorFilter.tint(Color.White),
+                                    modifier = Modifier
+                                        .size(28.dp)
+                                        .clickable(
+                                            interactionSource = remember { MutableInteractionSource() },
+                                            indication = null
+                                        ) {
+                                            isSearching = !isSearching
+                                            if (!isSearching) searchQuery = ""
+                                        }
+                                )
+
+                                // Menu — plain icon
                                 Image(
                                     painter = painterResource(R.drawable.ellipsis_horizontal),
                                     contentDescription = "Menu",
@@ -341,14 +351,6 @@ fun LocalPlaylistSongs(
                                                         }
                                                     }
                                                     MenuEntry(
-                                                        icon = R.drawable.arrow_down_up,
-                                                        text = if (isLocked) "Reorder songs" else "Done reordering",
-                                                        onClick = {
-                                                            menuState.hide()
-                                                            isLocked = !isLocked
-                                                        }
-                                                    )
-                                                    MenuEntry(
                                                         icon = R.drawable.pencil,
                                                         text = stringResource(R.string.rename),
                                                         onClick = { menuState.hide(); isRenaming = true }
@@ -397,71 +399,10 @@ fun LocalPlaylistSongs(
                             )
                         }
 
-                        // ---- CRISP COVER PHOTO (on top of blurred background) ----
-                        // If playlist has a custom cover: show it.
-                        // If no custom cover: use song thumbnails as collage.
-                        // - 1 song: single thumbnail
-                        // - 2-3 songs: first 2 thumbnails side by side
-                        // - 4+ songs: 2x2 collage of first 4 thumbnails
-                        Box(
-                            modifier = Modifier
-                                .padding(vertical = 8.dp)
-                                .size(240.dp)
-                                .shadow(
-                                    elevation = 6.dp,
-                                    shape = RoundedCornerShape(12.dp),
-                                    clip = false,
-                                    ambientColor = Color.Black,
-                                    spotColor = Color.Black
-                                )
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(colorPalette.background1)
-                        ) {
-                            if (thumbnailUrl != null) {
-                                // Custom cover photo
-                                AsyncImage(
-                                    model = thumbnailUrl,
-                                    contentDescription = "Playlist cover",
-                                    contentScale = ContentScale.Crop,
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            } else if (songs.isNotEmpty()) {
-                                // Auto-generated cover from song thumbnails
-                                val collageThumbs = songs.take(4).map { it.thumbnailUrl }
-                                if (collageThumbs.size == 1) {
-                                    // Single song — full thumbnail
-                                    AsyncImage(
-                                        model = collageThumbs[0],
-                                        contentDescription = "Playlist cover",
-                                        contentScale = ContentScale.Crop,
-                                        modifier = Modifier.fillMaxSize()
-                                    )
-                                } else {
-                                    // Multiple songs — 2x2 grid collage
-                                    Box(modifier = Modifier.fillMaxSize()) {
-                                        listOf(
-                                            Alignment.TopStart,
-                                            Alignment.TopEnd,
-                                            Alignment.BottomStart,
-                                            Alignment.BottomEnd
-                                        ).forEachIndexed { index, alignment ->
-                                            if (index < collageThumbs.size) {
-                                                AsyncImage(
-                                                    model = collageThumbs[index],
-                                                    contentDescription = null,
-                                                    contentScale = ContentScale.Crop,
-                                                    modifier = Modifier
-                                                        .align(alignment)
-                                                        .fillMaxSize(0.5f)
-                                                )
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-
-                        Spacer(modifier = Modifier.height(16.dp))
+                        // ---- LARGE SPACER (pushes content to CENTER of screen) ----
+                        // This pushes the playlist name + buttons to the vertical center,
+                        // matching the SimpMusic reference where play button is at ~50%.
+                        Spacer(modifier = Modifier.height(200.dp))
 
                         // ---- PLAYLIST NAME ----
                         BasicText(
@@ -593,9 +534,9 @@ fun LocalPlaylistSongs(
                                     interactionSource = remember { MutableInteractionSource() },
                                     indication = null
                                 ) { isSortedOldestFirst = !isSortedOldestFirst }
-                                .padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 10.dp),
+                                .padding(start = 16.dp, end = 12.dp, top = 10.dp, bottom = 10.dp),
                             verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
+                            horizontalArrangement = Arrangement.spacedBy(16.dp)
                         ) {
                             // Left: sort icon + text
                             Row(
@@ -665,9 +606,7 @@ fun LocalPlaylistSongs(
                         song = song,
                         thumbnailSize = Dimensions.thumbnails.song,
                         trailingContent = {
-                            if (!isLocked) {
-                                ReorderHandle(reorderingState = reorderingState, index = index)
-                            }
+                            ReorderHandle(reorderingState = reorderingState, index = index)
                         },
                         clip = !reorderingState.isDragging,
                         isPlaying = playing && currentMediaId == song.id
