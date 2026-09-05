@@ -1,5 +1,10 @@
 package app.vitune.android.ui.screens.home
 
+import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.animateFloatAsState
@@ -8,6 +13,8 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -33,16 +40,19 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
-import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -78,33 +88,35 @@ import app.vitune.core.ui.Dimensions
 import app.vitune.core.ui.LocalAppearance
 import app.vitune.providers.piped.Piped
 import app.vitune.providers.piped.models.Session
+import coil3.compose.AsyncImage
 import kotlinx.collections.immutable.toImmutableList
 import kotlinx.coroutines.async
-import app.vitune.providers.piped.models.PlaylistPreview as PipedPlaylistPreview
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Route
 @Composable
 fun HomePlaylists(
     onBuiltInPlaylist: (BuiltInPlaylist) -> Unit,
     onPlaylistClick: (Playlist) -> Unit,
-    onPipedPlaylistClick: (Session, PipedPlaylistPreview) -> Unit,
+    onPipedPlaylistClick: (Session, app.vitune.providers.piped.models.PlaylistPreview) -> Unit,
     onSearchClick: () -> Unit
 ) = with(OrderPreferences) {
     val (colorPalette) = LocalAppearance.current
+    val context = LocalContext.current
 
     var isCreatingANewPlaylist by rememberSaveable { mutableStateOf(false) }
 
     if (isCreatingANewPlaylist) TextFieldDialog(
         hintText = stringResource(R.string.enter_playlist_name_prompt),
-        onDismiss = { isCreatingANewPlaylist = false },
         onAccept = { text ->
             query {
                 Database.insert(Playlist(name = text))
             }
         }
     )
+
     var items by persistList<PlaylistPreview>("home/playlists")
-    var pipedSessions by persist<Map<PipedSession, List<PipedPlaylistPreview>?>>("home/piped")
+    var pipedSessions by persist<Map<PipedSession, List<app.vitune.providers.piped.models.PlaylistPreview>?>>("home/piped")
 
     LaunchedEffect(playlistSortBy, playlistSortOrder) {
         Database
@@ -159,46 +171,25 @@ fun HomePlaylists(
                     Spacer(modifier = Modifier.weight(1f))
 
                     HeaderIconButton(
-                        icon = if (UIStatePreferences.playlistsAsGrid) R.drawable.grid else R.drawable.list,
+                        icon = R.drawable.grid_view,
+                        enabled = UIStatePreferences.playlistsAsGrid,
+                        onClick = { UIStatePreferences.playlistsAsGrid = !UIStatePreferences.playlistsAsGrid }
+                    )
+
+                    VerticalDivider()
+
+                    HeaderIconButton(
+                        icon = R.drawable.sort,
+                        rotation = sortOrderIconRotation,
                         onClick = {
-                            UIStatePreferences.playlistsAsGrid = !UIStatePreferences.playlistsAsGrid
+                            playlistSortOrder = if (playlistSortOrder == SortOrder.Ascending)
+                                SortOrder.Descending else SortOrder.Ascending
                         }
-                    )
-
-                    VerticalDivider(modifier = Modifier.height(8.dp))
-
-                    HeaderIconButton(
-                        icon = R.drawable.medical,
-                        enabled = playlistSortBy == PlaylistSortBy.SongCount,
-                        onClick = { playlistSortBy = PlaylistSortBy.SongCount }
-                    )
-
-                    HeaderIconButton(
-                        icon = R.drawable.text,
-                        enabled = playlistSortBy == PlaylistSortBy.Name,
-                        onClick = { playlistSortBy = PlaylistSortBy.Name }
-                    )
-
-                    HeaderIconButton(
-                        icon = R.drawable.time,
-                        enabled = playlistSortBy == PlaylistSortBy.DateAdded,
-                        onClick = { playlistSortBy = PlaylistSortBy.DateAdded }
-                    )
-
-                    Spacer(modifier = Modifier.width(2.dp))
-
-                    HeaderIconButton(
-                        icon = R.drawable.arrow_up,
-                        color = colorPalette.text,
-                        onClick = { playlistSortOrder = !playlistSortOrder },
-                        modifier = Modifier.graphicsLayer { rotationZ = sortOrderIconRotation }
                     )
                 }
             }
 
             // 2x2 Bento Grid Layout for Built-in Playlists
-            // NO extra horizontal padding — the LazyVerticalGrid's contentPadding
-            // handles the horizontal insets, so the buttons align with playlist cards.
             if (builtInPlaylists.isNotEmpty()) item(key = "built_in_grid", span = { GridItemSpan(maxLineSpan) }) {
                 Column(
                     verticalArrangement = Arrangement.spacedBy(Dimensions.items.alternativePadding),
@@ -212,24 +203,22 @@ fun HomePlaylists(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (BuiltInPlaylist.Favorites in builtInPlaylists) {
-                            FluidInterlockingPlaylistPill(
+                            CapsulePlaylistButton(
                                 icon = R.drawable.heart,
                                 colorTint = colorPalette.red,
                                 name = stringResource(R.string.favorites),
                                 onClick = { onBuiltInPlaylist(BuiltInPlaylist.Favorites) },
-                                position = FluidPosition.First,
                                 modifier = Modifier
                                     .weight(1f)
                                     .animateItem()
                             )
                         }
                         if (BuiltInPlaylist.Offline in builtInPlaylists) {
-                            FluidInterlockingPlaylistPill(
+                            CapsulePlaylistButton(
                                 icon = R.drawable.airplane,
                                 colorTint = colorPalette.blue,
                                 name = stringResource(R.string.offline),
                                 onClick = { onBuiltInPlaylist(BuiltInPlaylist.Offline) },
-                                position = FluidPosition.Second,
                                 modifier = Modifier
                                     .weight(1f)
                                     .animateItem()
@@ -243,24 +232,22 @@ fun HomePlaylists(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         if (BuiltInPlaylist.Top in builtInPlaylists) {
-                            FluidInterlockingPlaylistPill(
+                            CapsulePlaylistButton(
                                 icon = R.drawable.trending,
                                 colorTint = colorPalette.red,
                                 name = stringResource(R.string.format_my_top_playlist, DataPreferences.topListLength),
                                 onClick = { onBuiltInPlaylist(BuiltInPlaylist.Top) },
-                                position = FluidPosition.Third,
                                 modifier = Modifier
                                     .weight(1f)
                                     .animateItem()
                             )
                         }
                         if (BuiltInPlaylist.History in builtInPlaylists) {
-                            FluidInterlockingPlaylistPill(
+                            CapsulePlaylistButton(
                                 icon = R.drawable.history,
                                 colorTint = colorPalette.textDisabled,
                                 name = stringResource(R.string.history),
                                 onClick = { onBuiltInPlaylist(BuiltInPlaylist.History) },
-                                position = FluidPosition.Fourth,
                                 modifier = Modifier
                                     .weight(1f)
                                     .animateItem()
@@ -303,18 +290,12 @@ fun HomePlaylists(
                             key = { "piped-${session.username}-${it.id}" }
                         ) { playlist ->
                             PlaylistItem(
-                                name = playlist.name,
-                                songCount = playlist.videoCount,
-                                channelName = null,
-                                thumbnailUrl = playlist.thumbnailUrl.toString(),
+                                playlist = playlist,
                                 thumbnailSize = Dimensions.thumbnails.playlist,
                                 alternative = UIStatePreferences.playlistsAsGrid,
                                 modifier = Modifier
                                     .clickable(onClick = {
-                                        onPipedPlaylistClick(
-                                            session.toApiSession(),
-                                            playlist
-                                        )
+                                        onPipedPlaylistClick(session, playlist)
                                     })
                                     .animateItem(fadeInSpec = null, fadeOutSpec = null)
                             )
@@ -331,92 +312,140 @@ fun HomePlaylists(
     }
 }
 
-enum class FluidPosition {
-    First, Second, Third, Fourth
-}
+// ====================================================================
+//  CAPSULE PLAYLIST BUTTON
+//  - Full capsule shape (50% corner radius)
+//  - Long-press to set custom cover from gallery
+//  - Custom cover shown as blurred background (95% blur)
+//  - Glass reflection on top
+//  - Icon + label visible on top
+// ====================================================================
 
 @Composable
-fun FluidInterlockingPlaylistPill(
+fun CapsulePlaylistButton(
     @DrawableRes icon: Int,
     colorTint: Color,
     name: String,
     onClick: () -> Unit,
-    position: FluidPosition,
     modifier: Modifier = Modifier
 ) {
-    val (colorPalette) = LocalAppearance.current
+    val context = LocalContext.current
 
-    val shape = when (position) {
-        FluidPosition.First -> RoundedCornerShape(
-            topStart = 32.dp, topEnd = 32.dp,
-            bottomStart = 16.dp, bottomEnd = 36.dp
-        )
-        FluidPosition.Second -> RoundedCornerShape(
-            topStart = 24.dp, topEnd = 12.dp,
-            bottomStart = 36.dp, bottomEnd = 16.dp
-        )
-        FluidPosition.Third -> RoundedCornerShape(
-            topStart = 12.dp, topEnd = 32.dp,
-            bottomStart = 16.dp, bottomEnd = 24.dp
-        )
-        FluidPosition.Fourth -> RoundedCornerShape(
-            topStart = 24.dp, topEnd = 24.dp,
-            bottomStart = 32.dp, bottomEnd = 32.dp
-        )
+    // Custom cover URI for this button (persisted via SharedPreferences)
+    val prefs = remember { context.getSharedPreferences("capsule_covers", android.content.Context.MODE_PRIVATE) }
+    val coverKey = "cover_${name}"
+    var coverUri by remember { mutableStateOf(prefs.getString(coverKey, null)) }
+
+    // Image picker launcher
+    val coverPicker = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickVisualMedia()
+    ) { uri ->
+        if (uri != null) {
+            context.contentResolver.takePersistableUriPermission(
+                uri, Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+            prefs.edit().putString(coverKey, uri.toString()).apply()
+            coverUri = uri.toString()
+        }
     }
 
-    // ---- GLOSSY GLASS for built-in playlist buttons ----
-    // Same glossy effect as playlist cards:
-    // 1. Color-tinted translucent fill
-    // 2. Glossy white highlight at top (light reflection)
-    // 3. White border (glass edge)
-    // 4. Shadow for depth
-    Row(
+    // Capsule shape: fully rounded ends (50% of height)
+    val capsuleShape = RoundedCornerShape(50)
+
+    Box(
         modifier = modifier
             .fillMaxWidth()
-            .height(60.dp)
-            .clip(RoundedCornerShape(20.dp))
-            // Layer 1: Color-tinted fill
+            .height(56.dp)
+            .clip(capsuleShape)
+            // Layer 1: Base glass fill (color tinted)
             .background(colorTint.copy(alpha = 0.10f))
-            // Layer 2: Glossy top highlight
-            .background(
-                brush = Brush.verticalGradient(
-                    colorStops = arrayOf(
-                        0.0f to Color.White.copy(alpha = 0.30f),   // Bright top (light catch)
-                        0.3f to Color.White.copy(alpha = 0.08f),   // Fades
-                        0.5f to Color.Transparent                  // Gone by middle
+            // Layer 2: If custom cover, show it blurred (95% blur)
+            .then(
+                if (coverUri != null) {
+                    Modifier.background(color = Color.Black)
+                } else Modifier
+            )
+    ) {
+        // Blurred cover image (if set)
+        if (coverUri != null) {
+            AsyncImage(
+                model = coverUri,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .blur(25.dp)  // 95% blur
+            )
+        }
+
+        // Layer 3: Glass reflection (glossy top highlight)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(
+                    brush = Brush.verticalGradient(
+                        colorStops = arrayOf(
+                            0.0f to Color.White.copy(alpha = 0.35f),
+                            0.3f to Color.White.copy(alpha = 0.08f),
+                            0.5f to Color.Transparent
+                        )
                     )
                 )
-            )
-            // Layer 3: White border
-            .border(
-                width = 1.dp,
-                color = Color.White.copy(alpha = 0.25f),
-                shape = RoundedCornerShape(20.dp)
-            )
-            // Layer 4: Shadow
-            .shadow(
-                elevation = 8.dp,
-                shape = RoundedCornerShape(20.dp),
-                clip = false
-            )
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Image(
-            painter = painterResource(icon),
-            contentDescription = null,
-            colorFilter = ColorFilter.tint(colorTint),
-            modifier = Modifier.size(24.dp)
         )
-        BasicText(
-            text = name,
-            style = LocalAppearance.current.typography.xs.semiBold.copy(color = colorPalette.text),
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+
+        // Layer 4: White border (glass edge)
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .border(1.dp, Color.White.copy(alpha = 0.25f), capsuleShape)
         )
+
+        // Layer 5: Shadow
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .shadow(6.dp, capsuleShape, clip = false)
+        )
+
+        // Content: Icon + Label (on top of everything)
+        Row(
+            modifier = Modifier
+                .fillMaxSize()
+                .combinedClickable(
+                    onClick = onClick,
+                    onLongClick = {
+                        // Long-press → pick cover from gallery
+                        coverPicker.launch(
+                            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)
+                        )
+                    }
+                )
+                .padding(horizontal = 20.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Image(
+                painter = painterResource(icon),
+                contentDescription = null,
+                colorFilter = ColorFilter.tint(colorTint),
+                modifier = Modifier.size(24.dp)
+            )
+            BasicText(
+                text = name,
+                style = LocalAppearance.current.typography.xs.semiBold.copy(
+                    color = Color.White,
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color.Black.copy(alpha = 0.5f),
+                        blurRadius = 3f
+                    )
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
     }
 }
 
+enum class FluidPosition {
+    First, Second, Third, Fourth
+}
